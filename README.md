@@ -476,6 +476,8 @@ norma-ai/
 │   ├── rag/          # Embedding, vector store, retrieval boundaries
 │   ├── memory/       # Long-term memory boundaries
 │   └── main.py       # FastAPI composition root
+├── backend/alembic/  # Versioned PostgreSQL schema migrations
+├── embedding_service/ # Local BGE-M3 inference API
 ├── frontend/         # React, TypeScript, Vite, Tailwind CSS
 ├── docker/           # Container build definitions
 ├── docs/             # Architecture and engineering decisions
@@ -512,10 +514,10 @@ Status: Foundation Ready
 ## Phase 2 — Knowledge Engine
 
 
-- [ ] Document upload
-- [ ] Embeddings pipeline
-- [ ] Qdrant integration
-- [ ] RAG retrieval
+- [x] Document upload
+- [x] Embeddings pipeline
+- [x] Qdrant integration
+- [x] RAG retrieval
 
 
 ---
@@ -568,6 +570,11 @@ The API is available at `http://localhost:8000`, interactive documentation at
 `http://localhost:8000/docs`, liveness at
 `http://localhost:8000/api/v1/health`, and infrastructure readiness at
 `http://localhost:8000/api/v1/ready`.
+
+Knowledge endpoints are available under `/api/v1/knowledge`. Uploads support
+PDF, DOCX, Markdown, and TXT; semantic search is isolated by `workspace_id`.
+The first Docker startup downloads BGE-M3 into a persistent model cache and can
+therefore take several minutes.
 
 For backend development without Docker:
 

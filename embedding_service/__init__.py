@@ -1,0 +1,1 @@
+"""Local CPU embedding service."""

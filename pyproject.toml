@@ -9,13 +9,18 @@ description = "The AI Operating System for Knowledge and Execution"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "alembic",
     "asyncpg",
     "fastapi",
+    "httpx",
     "langchain",
     "langgraph",
     "openai",
     "pydantic",
     "pydantic-settings",
+    "pypdf",
+    "python-docx",
+    "python-multipart",
     "qdrant-client",
     "redis",
     "sqlalchemy[asyncio]",
@@ -24,7 +29,6 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "httpx",
     "pytest",
     "pytest-asyncio",
     "ruff",

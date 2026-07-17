@@ -23,12 +23,22 @@ def test_health_check() -> None:
     ("checks", "expected_status", "expected_code"),
     [
         (
-            {"postgres": True, "redis": True, "qdrant": True},
+            {
+                "postgres": True,
+                "redis": True,
+                "qdrant": True,
+                "embeddings": True,
+            },
             "ready",
             200,
         ),
         (
-            {"postgres": True, "redis": False, "qdrant": True},
+            {
+                "postgres": True,
+                "redis": False,
+                "qdrant": True,
+                "embeddings": True,
+            },
             "degraded",
             503,
         ),

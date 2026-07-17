@@ -7,6 +7,7 @@ process runs, while readiness controls whether it should receive traffic.
 import asyncio
 from dataclasses import dataclass
 
+import httpx
 from qdrant_client import AsyncQdrantClient
 from redis.asyncio import Redis
 from sqlalchemy import text
@@ -40,18 +41,33 @@ async def _check_redis() -> None:
 
 
 async def _check_qdrant() -> None:
-    client = AsyncQdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
+    client = AsyncQdrantClient(
+        host=settings.qdrant_host,
+        port=settings.qdrant_port,
+        check_compatibility=False,
+    )
     try:
         await client.get_collections()
     finally:
         await client.close()
 
 
+async def _check_embeddings() -> None:
+    async with httpx.AsyncClient(timeout=3) as client:
+        response = await client.get(f"{settings.embedding_service_url}/health")
+        response.raise_for_status()
+
+
 async def check_dependencies() -> ReadinessReport:
     """Check required infrastructure concurrently with bounded latency."""
 
-    names = ("postgres", "redis", "qdrant")
-    checks = (_check_postgres(), _check_redis(), _check_qdrant())
+    names = ("postgres", "redis", "qdrant", "embeddings")
+    checks = (
+        _check_postgres(),
+        _check_redis(),
+        _check_qdrant(),
+        _check_embeddings(),
+    )
     results = await asyncio.gather(
         *(asyncio.wait_for(check, timeout=3) for check in checks),
         return_exceptions=True,

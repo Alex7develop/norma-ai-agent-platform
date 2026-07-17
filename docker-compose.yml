@@ -7,15 +7,56 @@ services:
       dockerfile: docker/backend.Dockerfile
     env_file:
       - .env
+    environment:
+      EMBEDDING_SERVICE_URL: http://embeddings:8001
     ports:
       - "8000:8000"
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       qdrant:
         condition: service_healthy
+      embeddings:
+        condition: service_healthy
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    env_file:
+      - .env
+    command: ["alembic", "-c", "alembic.ini", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  embeddings:
+    build:
+      context: .
+      dockerfile: docker/embedding.Dockerfile
+    environment:
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-m3}
+      HF_HOME: /models
+    ports:
+      - "8001:8001"
+    volumes:
+      - embedding_models:/models
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 120s
     restart: unless-stopped
 
   postgres:
@@ -71,3 +112,4 @@ volumes:
   postgres_data:
   redis_data:
   qdrant_data:
+  embedding_models:

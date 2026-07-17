@@ -10,6 +10,7 @@ from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.logging import configure_logging
 from app.database.session import engine
+from app.rag.container import close_rag_clients
 
 
 @asynccontextmanager
@@ -18,6 +19,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
     configure_logging(settings.log_level)
     yield
+    await close_rag_clients()
     await engine.dispose()
 
 

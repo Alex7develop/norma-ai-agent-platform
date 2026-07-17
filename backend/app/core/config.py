@@ -33,7 +33,13 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://norma:norma@localhost:5432/norma"
     qdrant_host: str = "localhost"
     qdrant_port: int = 6333
+    qdrant_collection: str = "norma_knowledge"
     redis_url: str = "redis://localhost:6379/0"
+    embedding_service_url: str = "http://localhost:8001"
+    embedding_dimension: int = 1024
+    max_upload_size_bytes: int = 10 * 1024 * 1024
+    chunk_size: int = 2_500
+    chunk_overlap: int = 300
     secret_key: SecretStr = SecretStr("change-me-in-production")
 
 

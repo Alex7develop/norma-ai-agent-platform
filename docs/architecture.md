@@ -24,12 +24,25 @@ not depend directly on Qdrant response models.
 ## Runtime topology
 
 The local topology contains one stateless FastAPI process, PostgreSQL for
-durable relational state, Redis for ephemeral coordination, and Qdrant for
-vector search. All persistent services use named Docker volumes.
+durable relational state, Redis for ephemeral coordination, Qdrant for vector
+search, and an independently scalable BGE-M3 embedding service. Persistent
+services and the model cache use named Docker volumes.
 
-The liveness endpoint deliberately checks only the API process. A separate
-readiness endpoint should be introduced when dependency adapters are wired, so
-an infrastructure outage does not create a container restart loop.
+The liveness endpoint deliberately checks only the API process. The readiness
+endpoint checks PostgreSQL, Redis, Qdrant, and embeddings without turning a
+temporary dependency outage into an application restart loop.
+
+## Knowledge engine
+
+Document metadata and extracted chunks are durable in PostgreSQL. Dense vectors
+and retrieval payloads are stored in Qdrant using cosine distance and are always
+filtered by `workspace_id`. BGE-M3 runs behind an HTTP boundary so API and
+embedding capacity can scale independently.
+
+The first ingestion path is synchronous and deliberately bounded by file,
+page, character, and batch limits. The application service boundary is retained
+so ingestion can move to a durable Redis-backed worker without changing API,
+parser, embedding, or vector-store contracts.
 
 ## Scaling path
 
