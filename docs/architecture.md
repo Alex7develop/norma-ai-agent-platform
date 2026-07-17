@@ -44,6 +44,18 @@ page, character, and batch limits. The application service boundary is retained
 so ingestion can move to a durable Redis-backed worker without changing API,
 parser, embedding, or vector-store contracts.
 
+## First agent workflow
+
+The initial LangGraph workflow is stateless and intentionally narrow:
+workspace-scoped retrieval followed by one grounded OpenRouter generation. The
+system prompt treats retrieved documents as untrusted context, requires source
+citations, and avoids an LLM call when retrieval returns no evidence.
+
+The selected model is configured through `OPENROUTER_MODEL`; provider-specific
+details do not leak into the graph. Conversation memory, tools, planning, and
+multi-agent delegation remain separate future capabilities rather than hidden
+behavior in the first assistant.
+
 ## Scaling path
 
 1. Add Alembic migrations, tenant-aware identity, and request observability.

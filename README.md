@@ -525,7 +525,7 @@ Status: Foundation Ready
 ## Phase 3 — Agent System
 
 
-- [ ] LangGraph workflow
+- [x] LangGraph RAG Assistant workflow
 - [ ] Coordinator Agent
 - [ ] Research Agent
 - [ ] Memory Agent
@@ -575,6 +575,10 @@ Knowledge endpoints are available under `/api/v1/knowledge`. Uploads support
 PDF, DOCX, Markdown, and TXT; semantic search is isolated by `workspace_id`.
 The first Docker startup downloads BGE-M3 into a persistent model cache and can
 therefore take several minutes.
+
+The first agent endpoint is `POST /api/v1/assistant/query`. It runs a stateless
+LangGraph workflow, retrieves only the requested workspace, and returns an
+OpenRouter-generated answer together with explicit source metadata.
 
 For backend development without Docker:
 

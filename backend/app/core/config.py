@@ -30,6 +30,8 @@ class Settings(BaseSettings):
 
     openrouter_api_key: SecretStr | None = None
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    openrouter_model: str = "google/gemini-3.5-flash"
+    llm_max_completion_tokens: int = 1_200
     database_url: str = "postgresql+asyncpg://norma:norma@localhost:5432/norma"
     qdrant_host: str = "localhost"
     qdrant_port: int = 6333
