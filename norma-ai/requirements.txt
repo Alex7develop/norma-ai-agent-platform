@@ -1,0 +1,2 @@
+# Compatibility entry point for tooling that does not consume pyproject.toml.
+-e .
