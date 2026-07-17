@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 
 from app.agents.execution import assemble_pack
-from app.agents.research import _split_fenced_sections
+from app.agents.markdown_sections import split_fenced_sections
 from app.core.config import Settings
 from app.rag.retriever import RetrievedDocument
 from app.workflows.launch_strategy import LaunchStrategyWorkflow
@@ -58,7 +58,7 @@ def create_sequenced_client(responses: list[str]) -> SimpleNamespace:
 
 
 def test_split_fenced_sections() -> None:
-    research, competitors = _split_fenced_sections(
+    research, competitors = split_fenced_sections(
         "```research\nMarket A\n```\n```competitors\nRival B\n```",
         ("research", "competitors"),
     )
@@ -66,7 +66,7 @@ def test_split_fenced_sections() -> None:
     assert competitors == "Rival B"
 
 
-def test_assemble_pack_includes_sections() -> None:
+def test_assemble_pack_includes_full_sections() -> None:
     pack = assemble_pack(
         product_name="Aussie Coffee",
         brief="Open cafes",
@@ -75,10 +75,18 @@ def test_assemble_pack_includes_sections() -> None:
         positioning_md="Premium local",
         roadmap_md="Phase 1 Melbourne",
         marketing_md="Instagram first",
+        business_model_md="Franchise hybrid",
+        financial_md="Unit economics ranges",
+        prd_md="MVP scope",
+        tech_spec_md="API + RAG",
+        cursor_prompts_md="Build intake form",
+        linkedin_md="Launch post",
+        telegram_md="Channel update",
     )
     assert "# Launch Strategy Pack — Aussie Coffee" in pack
-    assert "Demand is growing" in pack
-    assert "Phase 1 Melbourne" in pack
+    assert "Franchise hybrid" in pack
+    assert "Build intake form" in pack
+    assert "Channel update" in pack
 
 
 @pytest.mark.asyncio
@@ -91,6 +99,17 @@ async def test_launch_strategy_runs_agents_and_persists() -> None:
                 "```positioning\nNeighborhood premium\n```\n"
                 "```roadmap\nMelbourne then Sydney\n```\n"
                 "```marketing\nSoft launch + LinkedIn\n```"
+            ),
+            (
+                "```business_model\nCompany-owned hubs\n```\n"
+                "```financial\nCapex ranges\n```\n"
+                "```prd\nMVP: 3 locations\n```\n"
+                "```tech_spec\nPOS + CRM\n```"
+            ),
+            (
+                "```cursor_prompts\nImplement store locator\n```\n"
+                "```linkedin\nWe are expanding\n```\n"
+                "```telegram\nSoft open next month\n```"
             ),
         ]
     )
@@ -117,10 +136,11 @@ async def test_launch_strategy_runs_agents_and_persists() -> None:
 
     assert result.product_name == "Aussie Roast"
     assert result.document_id == persister.document_id
-    assert len(result.artifacts) == 6
+    assert len(result.artifacts) == 13
     assert result.artifacts[0].content_md == "Coffee demand"
-    assert "Neighborhood premium" in result.artifacts[2].content_md
+    assert result.artifacts[5].kind == "business_model"
+    assert "Company-owned hubs" in result.artifacts[5].content_md
+    assert result.artifacts[9].kind == "cursor_prompts"
     assert persister.calls
-    assert persister.calls[0][0].startswith("launch-strategy-aussie-roast-")
-    assert "Coffee demand" in persister.calls[0][1]
-    assert client.chat.completions.create.await_count == 2
+    assert "Implement store locator" in persister.calls[0][1]
+    assert client.chat.completions.create.await_count == 4

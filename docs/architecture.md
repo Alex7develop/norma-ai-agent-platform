@@ -63,14 +63,23 @@ The second LangGraph workflow coordinates specialist agents for a launch brief:
 1. retrieve workspace context
 2. Research Agent synthesizes market and competitor notes
 3. Planning Agent drafts positioning, roadmap, and marketing outline
-4. Execution Agent assembles one markdown pack and ingests it through
+4. Spec Agent drafts business model, financial outline, PRD, and tech TZ
+5. Content Agent drafts Cursor prompts plus LinkedIn and Telegram posts
+6. Execution Agent assembles one markdown pack and ingests it through
    `KnowledgeService`
+7. Memory Agent stores a short workflow summary in `workspace_memories`
 
 Runs and artifacts are persisted (`workflow_runs`, `workflow_artifacts`) for
 auditability. The pack becomes ordinary workspace knowledge, so the RAG
-assistant can cite it on later questions. Live web search, financial models,
-PRD/tech-spec generators, and Redis workers are deferred until this
-brief → agents → knowledge loop is stable.
+assistant can cite it on later questions. Live web search and Redis workers
+remain deferred.
+
+## Conversation memory
+
+Assistant turns are stored in `conversations` / `conversation_messages`, scoped
+by workspace and user. Optional `conversation_id` continues a thread. Before
+generation, the RAG workflow receives recent chat turns and workspace memory
+notes as supporting (untrusted) context alongside retrieved chunks.
 
 ## Authentication
 

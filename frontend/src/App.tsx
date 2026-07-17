@@ -14,6 +14,8 @@ import {
   type AuthSession,
   deleteDocument,
   getSession,
+  listConversationMessages,
+  listConversations,
   listDocuments,
   type KnowledgeDocument,
   logout,
@@ -36,6 +38,7 @@ export function App() {
     documents: KnowledgeDocument[];
   }>({ workspaceId: null, documents: [] });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [launchRunning, setLaunchRunning] = useState(false);
@@ -90,6 +93,33 @@ export function App() {
         setError(errorMessage(requestError));
         setDocumentCache({ workspaceId, documents: [] });
       });
+
+    void listConversations(workspaceId)
+      .then(async (conversations) => {
+        if (!active || conversations.length === 0) {
+          if (active) {
+            setConversationId(null);
+            setMessages([]);
+          }
+          return;
+        }
+        const latest = conversations[0];
+        const history = await listConversationMessages(workspaceId, latest.id);
+        if (!active) return;
+        setConversationId(latest.id);
+        setMessages(
+          history.map((item) => ({
+            id: item.id,
+            role: item.role === "assistant" ? "assistant" : "user",
+            content: item.content,
+          })),
+        );
+      })
+      .catch(() => {
+        if (!active) return;
+        setConversationId(null);
+      });
+
     return () => {
       active = false;
     };
@@ -136,7 +166,12 @@ export function App() {
     setError(null);
 
     try {
-      const response = await askAssistant(workspaceId, question);
+      const response = await askAssistant(
+        workspaceId,
+        question,
+        conversationId,
+      );
+      setConversationId(response.conversation_id);
       setMessages((current) => [
         ...current,
         {
@@ -191,6 +226,7 @@ export function App() {
     setSession(null);
     setDocumentCache({ workspaceId: null, documents: [] });
     setMessages([]);
+    setConversationId(null);
     setLaunchRun(null);
   }
 
@@ -208,6 +244,7 @@ export function App() {
         onAuthenticated={(next) => {
           setSession(next);
           setMessages([]);
+          setConversationId(null);
           setError(null);
         }}
       />

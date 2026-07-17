@@ -2,7 +2,7 @@
 
 from collections.abc import AsyncIterator, Iterator
 from contextlib import contextmanager
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 from app.api.dependencies import get_current_user
@@ -30,8 +30,9 @@ def authenticated_client(module_path: str) -> Iterator[User]:
     async def override_user() -> User:
         return user
 
-    async def override_session() -> AsyncIterator[MagicMock]:
-        yield MagicMock()
+    async def override_session() -> AsyncIterator[AsyncMock]:
+        session = AsyncMock()
+        yield session
 
     app.dependency_overrides[get_current_user] = override_user
     app.dependency_overrides[get_db_session] = override_session

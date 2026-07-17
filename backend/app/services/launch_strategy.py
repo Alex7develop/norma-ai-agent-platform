@@ -14,6 +14,7 @@ from app.database.workflow_models import (
     WorkflowStatus,
 )
 from app.services.knowledge import KnowledgeService
+from app.services.memory import MemoryService
 from app.workflows.launch_strategy import LaunchStrategyResult, LaunchStrategyWorkflow
 
 
@@ -51,10 +52,12 @@ class LaunchStrategyService:
         session: AsyncSession,
         workflow: LaunchStrategyWorkflow | None = None,
         knowledge: KnowledgeService | None = None,
+        memory: MemoryService | None = None,
     ) -> None:
         self.session = session
         self.workflow = workflow
         self.knowledge = knowledge
+        self.memory = memory
 
     async def run(
         self,
@@ -91,6 +94,17 @@ class LaunchStrategyService:
                 product_name=product_name,
             )
             await self._persist_result(run, result)
+            if self.memory is not None:
+                await self.memory.remember_workflow_summary(
+                    workspace_id=workspace_id,
+                    run_id=run.id,
+                    summary_md=(
+                        f"Launch Strategy completed for **{result.product_name}**.\n\n"
+                        f"Brief: {brief.strip()[:500]}\n\n"
+                        f"Pack saved as `{result.pack_filename}` "
+                        f"(document_id={result.document_id})."
+                    ),
+                )
             run.status = WorkflowStatus.COMPLETED
             run.product_name = result.product_name
             run.error = None
@@ -115,6 +129,13 @@ class LaunchStrategyService:
             "positioning": ArtifactKind.POSITIONING,
             "roadmap": ArtifactKind.ROADMAP,
             "marketing": ArtifactKind.MARKETING,
+            "business_model": ArtifactKind.BUSINESS_MODEL,
+            "financial": ArtifactKind.FINANCIAL,
+            "prd": ArtifactKind.PRD,
+            "tech_spec": ArtifactKind.TECH_SPEC,
+            "cursor_prompts": ArtifactKind.CURSOR_PROMPTS,
+            "linkedin": ArtifactKind.LINKEDIN,
+            "telegram": ArtifactKind.TELEGRAM,
             "pack": ArtifactKind.PACK,
         }
         for artifact in result.artifacts:

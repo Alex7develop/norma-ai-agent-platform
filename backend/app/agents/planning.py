@@ -4,7 +4,7 @@ from typing import Any
 
 from openai import AsyncOpenAI
 
-from app.agents.research import _split_fenced_sections
+from app.agents.markdown_sections import split_fenced_sections
 from app.core.config import Settings, settings
 
 
@@ -53,7 +53,7 @@ class PlanningAgent:
             ],
         )
         content = completion.choices[0].message.content or ""
-        positioning_md, roadmap_md, marketing_md = _split_fenced_sections(
+        positioning_md, roadmap_md, marketing_md = split_fenced_sections(
             content,
             ("positioning", "roadmap", "marketing"),
         )

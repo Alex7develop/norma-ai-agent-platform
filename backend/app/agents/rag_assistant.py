@@ -14,10 +14,14 @@ class RagAssistantAgent:
         *,
         workspace_id: str,
         question: str,
+        chat_context: list[dict[str, str]] | None = None,
+        workspace_notes: list[str] | None = None,
     ) -> RagAssistantResult:
-        """Answer one question using only scoped retrieved knowledge."""
+        """Answer one question using scoped knowledge and optional memory."""
 
         return await self.workflow.invoke(
             workspace_id=workspace_id,
             question=question,
+            chat_context=chat_context,
+            workspace_notes=workspace_notes,
         )

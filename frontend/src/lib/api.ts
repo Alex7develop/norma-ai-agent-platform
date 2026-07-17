@@ -25,6 +25,21 @@ export interface AssistantAnswer {
   answer: string;
   sources: AssistantSource[];
   model: string;
+  conversation_id: string;
+}
+
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConversationMessage {
+  id: string;
+  role: string;
+  content: string;
+  created_at: string;
 }
 
 export interface AuthUser {
@@ -161,12 +176,34 @@ export function deleteDocument(
 export function askAssistant(
   workspaceId: string,
   question: string,
+  conversationId?: string | null,
 ): Promise<AssistantAnswer> {
   return request("/assistant/query", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ workspace_id: workspaceId, question }),
+    body: JSON.stringify({
+      workspace_id: workspaceId,
+      question,
+      conversation_id: conversationId ?? null,
+    }),
   });
+}
+
+export function listConversations(
+  workspaceId: string,
+): Promise<ConversationSummary[]> {
+  const query = new URLSearchParams({ workspace_id: workspaceId });
+  return request(`/assistant/conversations?${query}`);
+}
+
+export function listConversationMessages(
+  workspaceId: string,
+  conversationId: string,
+): Promise<ConversationMessage[]> {
+  const query = new URLSearchParams({ workspace_id: workspaceId });
+  return request(
+    `/assistant/conversations/${conversationId}/messages?${query}`,
+  );
 }
 
 export interface WorkflowArtifact {

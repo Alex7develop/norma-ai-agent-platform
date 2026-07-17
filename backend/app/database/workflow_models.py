@@ -32,6 +32,13 @@ class ArtifactKind(enum.StrEnum):
     POSITIONING = "positioning"
     ROADMAP = "roadmap"
     MARKETING = "marketing"
+    BUSINESS_MODEL = "business_model"
+    FINANCIAL = "financial"
+    PRD = "prd"
+    TECH_SPEC = "tech_spec"
+    CURSOR_PROMPTS = "cursor_prompts"
+    LINKEDIN = "linkedin"
+    TELEGRAM = "telegram"
     PACK = "pack"
 
 

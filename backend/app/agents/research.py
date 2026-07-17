@@ -4,6 +4,7 @@ from typing import Any
 
 from openai import AsyncOpenAI
 
+from app.agents.markdown_sections import split_fenced_sections
 from app.core.config import Settings, settings
 
 
@@ -58,7 +59,7 @@ class ResearchAgent:
             ],
         )
         content = completion.choices[0].message.content or ""
-        research_md, competitors_md = _split_fenced_sections(
+        research_md, competitors_md = split_fenced_sections(
             content,
             ("research", "competitors"),
         )
@@ -66,30 +67,3 @@ class ResearchAgent:
             "research_md": research_md,
             "competitors_md": competitors_md,
         }
-
-
-def _split_fenced_sections(
-    content: str,
-    labels: tuple[str, ...],
-) -> tuple[str, ...]:
-    """Extract labeled fenced blocks; fall back to whole content for first label."""
-
-    results: list[str] = []
-    for label in labels:
-        marker = f"```{label}"
-        start = content.find(marker)
-        if start < 0:
-            results.append("")
-            continue
-        start = content.find("\n", start)
-        if start < 0:
-            results.append("")
-            continue
-        start += 1
-        end = content.find("```", start)
-        block = content[start:end].strip() if end >= 0 else content[start:].strip()
-        results.append(block)
-
-    if not any(results) and content.strip():
-        results[0] = content.strip()
-    return tuple(results)

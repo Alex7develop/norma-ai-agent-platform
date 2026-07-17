@@ -45,7 +45,7 @@ export function LaunchStrategyPanel({
               Launch Strategy
             </h2>
             <p className="text-[10px] text-slate-600">
-              Research · competitors · positioning · roadmap · marketing → KB
+              Research → specs → PRD → content → pack → KB + memory
             </p>
           </div>
         </div>

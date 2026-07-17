@@ -31,6 +31,7 @@ from app.services.launch_strategy import (
     WorkflowRunNotFound,
 )
 from app.services.llm import OpenRouterConfigurationError
+from app.services.memory import MemoryService
 from app.workflows.launch_strategy import LaunchStrategyWorkflow
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,12 @@ def get_knowledge_service(
     return KnowledgeService(session)
 
 
+def get_memory_service(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> MemoryService:
+    return MemoryService(session)
+
+
 def get_workflow_reader(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> LaunchStrategyService:
@@ -52,6 +59,7 @@ def get_workflow_reader(
 async def get_launch_strategy_service(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     knowledge: Annotated[KnowledgeService, Depends(get_knowledge_service)],
+    memory: Annotated[MemoryService, Depends(get_memory_service)],
 ) -> AsyncIterator[LaunchStrategyService]:
     try:
         workflow = LaunchStrategyWorkflow(
@@ -61,7 +69,12 @@ async def get_launch_strategy_service(
     except OpenRouterConfigurationError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     try:
-        yield LaunchStrategyService(session, workflow=workflow, knowledge=knowledge)
+        yield LaunchStrategyService(
+            session,
+            workflow=workflow,
+            knowledge=knowledge,
+            memory=memory,
+        )
     finally:
         await workflow.client.close()
 
