@@ -27,6 +27,23 @@ export interface AssistantAnswer {
   model: string;
 }
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  display_name: string;
+}
+
+export interface AuthWorkspace {
+  id: string;
+  name: string;
+  role: string;
+}
+
+export interface AuthSession {
+  user: AuthUser;
+  workspaces: AuthWorkspace[];
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -36,13 +53,41 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, init);
+function parseDetail(payload: { detail?: unknown }): string {
+  if (typeof payload.detail === "string") {
+    return payload.detail;
+  }
+  if (Array.isArray(payload.detail) && payload.detail[0]?.msg) {
+    return String(payload.detail[0].msg);
+  }
+  return "Request failed";
+}
+
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  retry = true,
+): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    ...init,
+    credentials: "include",
+    headers: init?.headers,
+  });
+
+  if (response.status === 401 && retry && !path.startsWith("/auth/")) {
+    const refreshed = await fetch(`${API_URL}/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (refreshed.ok) {
+      return request<T>(path, init, false);
+    }
+  }
+
   if (!response.ok) {
     let message = "Request failed";
     try {
-      const payload = (await response.json()) as { detail?: string };
-      message = payload.detail ?? message;
+      message = parseDetail((await response.json()) as { detail?: unknown });
     } catch {
       // The backend may return an empty or non-JSON infrastructure response.
     }
@@ -52,6 +97,38 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     return undefined as T;
   }
   return (await response.json()) as T;
+}
+
+export function register(payload: {
+  email: string;
+  password: string;
+  display_name: string;
+  workspace_name: string;
+}): Promise<AuthSession> {
+  return request("/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function login(payload: {
+  email: string;
+  password: string;
+}): Promise<AuthSession> {
+  return request("/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function logout(): Promise<void> {
+  return request("/auth/logout", { method: "POST" });
+}
+
+export function getSession(): Promise<AuthSession> {
+  return request("/auth/me");
 }
 
 export function listDocuments(

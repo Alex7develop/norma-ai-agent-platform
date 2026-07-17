@@ -15,7 +15,9 @@ from fastapi import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.dependencies import get_current_user, require_workspace_access
 from app.core.config import settings
+from app.database.auth_models import User
 from app.database.session import get_db_session
 from app.rag.container import retriever
 from app.rag.document_processing import DocumentProcessingError
@@ -46,9 +48,14 @@ def get_knowledge_service(
 async def list_documents(
     workspace_id: UUID,
     service: Annotated[KnowledgeService, Depends(get_knowledge_service)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    user: Annotated[User, Depends(get_current_user)],
 ) -> list[DocumentResponse]:
     """List indexed documents for one workspace."""
 
+    await require_workspace_access(
+        session, user_id=user.id, workspace_id=workspace_id
+    )
     documents = await service.list_documents(workspace_id=workspace_id)
     return [DocumentResponse.model_validate(document) for document in documents]
 
@@ -62,9 +69,14 @@ async def upload_document(
     workspace_id: Annotated[UUID, Form()],
     file: Annotated[UploadFile, File()],
     service: Annotated[KnowledgeService, Depends(get_knowledge_service)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    user: Annotated[User, Depends(get_current_user)],
 ) -> DocumentResponse:
     """Synchronously parse and index one bounded document."""
 
+    await require_workspace_access(
+        session, user_id=user.id, workspace_id=workspace_id
+    )
     if not file.filename:
         raise HTTPException(status_code=422, detail="Filename is required")
     data = await file.read(settings.max_upload_size_bytes + 1)
@@ -93,9 +105,14 @@ async def delete_document(
     document_id: UUID,
     workspace_id: UUID,
     service: Annotated[KnowledgeService, Depends(get_knowledge_service)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    user: Annotated[User, Depends(get_current_user)],
 ) -> Response:
     """Delete a document only inside its workspace namespace."""
 
+    await require_workspace_access(
+        session, user_id=user.id, workspace_id=workspace_id
+    )
     try:
         await service.delete(workspace_id=workspace_id, document_id=document_id)
     except KnowledgeDocumentNotFound as exc:
@@ -104,9 +121,16 @@ async def delete_document(
 
 
 @router.post("/search", response_model=SearchResponse)
-async def search_knowledge(payload: SearchRequest) -> SearchResponse:
+async def search_knowledge(
+    payload: SearchRequest,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> SearchResponse:
     """Return semantic chunks scoped to one workspace."""
 
+    await require_workspace_access(
+        session, user_id=user.id, workspace_id=payload.workspace_id
+    )
     results = await retriever.retrieve(
         payload.query,
         workspace_id=str(payload.workspace_id),

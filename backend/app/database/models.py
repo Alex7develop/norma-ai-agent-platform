@@ -9,4 +9,5 @@ class Base(DeclarativeBase):
 
 # Import model modules after Base is defined so Alembic sees every table in
 # Base.metadata without introducing circular imports.
+from app.database import auth_models as auth_models  # noqa: E402, F401
 from app.database import document_models as document_models  # noqa: E402, F401

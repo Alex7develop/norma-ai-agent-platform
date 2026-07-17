@@ -43,6 +43,13 @@ class Settings(BaseSettings):
     chunk_size: int = 2_500
     chunk_overlap: int = 300
     secret_key: SecretStr = SecretStr("change-me-in-production")
+    jwt_algorithm: str = "HS256"
+    jwt_issuer: str = "norma-ai"
+    jwt_audience: str = "norma-ai-api"
+    access_token_minutes: int = 15
+    refresh_token_days: int = 30
+    access_cookie_name: str = "norma_access"
+    refresh_cookie_name: str = "norma_refresh"
 
 
 @lru_cache

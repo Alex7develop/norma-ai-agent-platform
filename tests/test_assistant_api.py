@@ -3,6 +3,7 @@
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
+from tests.auth_helpers import authenticated_client
 
 from app.api.v1.assistant import get_rag_assistant
 from app.main import app
@@ -26,19 +27,32 @@ class FakeAssistantAgent:
         )
 
 
+def test_assistant_query_requires_auth() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/assistant/query",
+            json={
+                "workspace_id": str(uuid4()),
+                "question": "Where are vectors stored?",
+            },
+        )
+    assert response.status_code == 401
+
+
 def test_assistant_query_contract() -> None:
     app.dependency_overrides[get_rag_assistant] = FakeAssistantAgent
     try:
-        with TestClient(app) as client:
-            response = client.post(
-                "/api/v1/assistant/query",
-                json={
-                    "workspace_id": str(uuid4()),
-                    "question": "Where are vectors stored?",
-                },
-            )
+        with authenticated_client("app.api.v1.assistant"):
+            with TestClient(app) as client:
+                response = client.post(
+                    "/api/v1/assistant/query",
+                    json={
+                        "workspace_id": str(uuid4()),
+                        "question": "Where are vectors stored?",
+                    },
+                )
     finally:
-        app.dependency_overrides.clear()
+        app.dependency_overrides.pop(get_rag_assistant, None)
 
     assert response.status_code == 200
     payload = response.json()

@@ -11,6 +11,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "alembic",
     "asyncpg",
+    "email-validator",
     "fastapi",
     "httpx",
     "langchain",
@@ -18,6 +19,8 @@ dependencies = [
     "openai",
     "pydantic",
     "pydantic-settings",
+    "pwdlib[argon2]",
+    "pyjwt",
     "pypdf",
     "python-docx",
     "python-multipart",
@@ -38,7 +41,7 @@ dev = [
 where = ["backend"]
 
 [tool.pytest.ini_options]
-pythonpath = ["backend"]
+pythonpath = ["backend", "."]
 testpaths = ["tests"]
 addopts = "-q"
 

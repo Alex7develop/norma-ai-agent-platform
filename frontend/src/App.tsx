@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertCircle, X } from "lucide-react";
+import { AlertCircle, LoaderCircle, X } from "lucide-react";
 
+import { AuthScreen } from "./components/AuthScreen";
 import {
   ChatWorkspace,
   type ChatMessage,
@@ -10,12 +11,14 @@ import { Sidebar } from "./components/Sidebar";
 import {
   ApiError,
   askAssistant,
+  type AuthSession,
   deleteDocument,
+  getSession,
   listDocuments,
   type KnowledgeDocument,
+  logout,
   uploadDocument,
 } from "./lib/api";
-import { getWorkspaceId } from "./lib/workspace";
 
 function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
@@ -24,35 +27,64 @@ function errorMessage(error: unknown): string {
 }
 
 export function App() {
-  const [workspaceId] = useState(getWorkspaceId);
-  const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
+  const [session, setSession] = useState<AuthSession | null>(null);
+  const [booting, setBooting] = useState(true);
+  const [documentCache, setDocumentCache] = useState<{
+    workspaceId: string | null;
+    documents: KnowledgeDocument[];
+  }>({ workspaceId: null, documents: [] });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loadingDocuments, setLoadingDocuments] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const workspace = session?.workspaces[0] ?? null;
+  const workspaceId = workspace?.id ?? null;
+  const documents =
+    documentCache.workspaceId === workspaceId ? documentCache.documents : [];
+  const loadingDocuments =
+    Boolean(workspaceId) && documentCache.workspaceId !== workspaceId;
+
+  useEffect(() => {
+    let active = true;
+    getSession()
+      .then((result) => {
+        if (active) setSession(result);
+      })
+      .catch(() => {
+        if (active) setSession(null);
+      })
+      .finally(() => {
+        if (active) setBooting(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const refreshDocuments = useCallback(async () => {
+    if (!workspaceId) return;
     try {
-      setDocuments(await listDocuments(workspaceId));
+      const result = await listDocuments(workspaceId);
+      setDocumentCache({ workspaceId, documents: result });
     } catch (requestError) {
       setError(errorMessage(requestError));
-    } finally {
-      setLoadingDocuments(false);
     }
   }, [workspaceId]);
 
   useEffect(() => {
+    if (!workspaceId) {
+      return;
+    }
     let active = true;
-    listDocuments(workspaceId)
+    void listDocuments(workspaceId)
       .then((result) => {
-        if (active) setDocuments(result);
+        if (active) setDocumentCache({ workspaceId, documents: result });
       })
       .catch((requestError: unknown) => {
-        if (active) setError(errorMessage(requestError));
-      })
-      .finally(() => {
-        if (active) setLoadingDocuments(false);
+        if (!active) return;
+        setError(errorMessage(requestError));
+        setDocumentCache({ workspaceId, documents: [] });
       });
     return () => {
       active = false;
@@ -60,6 +92,7 @@ export function App() {
   }, [workspaceId]);
 
   async function handleUpload(file: File) {
+    if (!workspaceId) return;
     setUploading(true);
     setError(null);
     try {
@@ -73,19 +106,22 @@ export function App() {
   }
 
   async function handleDelete(documentId: string) {
-    const snapshot = documents;
-    setDocuments((current) =>
-      current.filter((document) => document.id !== documentId),
-    );
+    if (!workspaceId) return;
+    const snapshot = documentCache;
+    setDocumentCache({
+      workspaceId,
+      documents: documents.filter((document) => document.id !== documentId),
+    });
     try {
       await deleteDocument(workspaceId, documentId);
     } catch (requestError) {
-      setDocuments(snapshot);
+      setDocumentCache(snapshot);
       setError(errorMessage(requestError));
     }
   }
 
   async function handleSend(question: string) {
+    if (!workspaceId) return;
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
@@ -123,9 +159,44 @@ export function App() {
     }
   }
 
+  async function handleLogout() {
+    try {
+      await logout();
+    } catch {
+      // Clear local session even if the revoke request fails.
+    }
+    setSession(null);
+    setDocumentCache({ workspaceId: null, documents: [] });
+    setMessages([]);
+  }
+
+  if (booting) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-[#080c14] text-slate-500">
+        <LoaderCircle className="size-6 animate-spin text-cyan-400" />
+      </div>
+    );
+  }
+
+  if (!session || !workspace) {
+    return (
+      <AuthScreen
+        onAuthenticated={(next) => {
+          setSession(next);
+          setMessages([]);
+          setError(null);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-[#080c14] text-slate-200">
-      <Sidebar />
+      <Sidebar
+        user={session.user}
+        workspace={workspace}
+        onLogout={() => void handleLogout()}
+      />
       <ChatWorkspace
         messages={messages}
         thinking={thinking}

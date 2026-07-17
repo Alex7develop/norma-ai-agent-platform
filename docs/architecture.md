@@ -56,14 +56,19 @@ details do not leak into the graph. Conversation memory, tools, planning, and
 multi-agent delegation remain separate future capabilities rather than hidden
 behavior in the first assistant.
 
+## Authentication
+
+Users authenticate with email and password. Access and refresh JWTs are issued
+as HttpOnly cookies. Refresh tokens are stored only as SHA-256 hashes and can
+be revoked. Knowledge and assistant endpoints require a valid access cookie and
+a matching workspace membership; missing membership returns 404 to avoid
+workspace enumeration.
+
 ## Frontend workspace
 
-The React client consumes only versioned API contracts. It keeps a generated
-workspace UUID in local storage for the pre-authentication MVP, lists and
-manages indexed documents, and renders assistant source metadata alongside each
-answer. The UUID is a namespace convenience, not an authorization boundary;
-the backend must derive workspace identity from authenticated claims before
-multi-user deployment.
+The React client consumes only versioned API contracts. It restores the current
+session through `/auth/me`, lists and manages indexed documents for the user's
+first workspace, and renders assistant source metadata alongside each answer.
 
 ## Scaling path
 

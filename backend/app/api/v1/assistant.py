@@ -10,8 +10,12 @@ from qdrant_client.http.exceptions import (
     ResponseHandlingException,
     UnexpectedResponse,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.rag_assistant import RagAssistantAgent
+from app.api.dependencies import get_current_user, require_workspace_access
+from app.database.auth_models import User
+from app.database.session import get_db_session
 from app.rag.container import retriever
 from app.rag.embeddings import EmbeddingServiceError
 from app.schemas.assistant import AssistantQuery, AssistantResponse
@@ -39,9 +43,14 @@ async def get_rag_assistant() -> AsyncIterator[RagAssistantAgent]:
 async def query_assistant(
     payload: AssistantQuery,
     agent: Annotated[RagAssistantAgent, Depends(get_rag_assistant)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    user: Annotated[User, Depends(get_current_user)],
 ) -> AssistantResponse:
     """Answer from workspace knowledge through a LangGraph workflow."""
 
+    await require_workspace_access(
+        session, user_id=user.id, workspace_id=payload.workspace_id
+    )
     try:
         result = await agent.answer(
             workspace_id=str(payload.workspace_id),
