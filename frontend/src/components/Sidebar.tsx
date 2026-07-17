@@ -10,19 +10,33 @@ import {
 
 import type { AuthUser, AuthWorkspace } from "../lib/api";
 
-const navigation = [
-  { label: "Assistant", icon: Bot, active: true },
-  { label: "Knowledge", icon: FileText },
-  { label: "Workflows", icon: Boxes, badge: "Soon" },
+export type AppView = "assistant" | "workflows" | "knowledge";
+
+const navigation: {
+  id: AppView;
+  label: string;
+  icon: typeof Bot;
+}[] = [
+  { id: "assistant", label: "Assistant", icon: Bot },
+  { id: "workflows", label: "Workflows", icon: Boxes },
+  { id: "knowledge", label: "Knowledge", icon: FileText },
 ];
 
 interface SidebarProps {
   user: AuthUser;
   workspace: AuthWorkspace;
+  activeView: AppView;
+  onNavigate: (view: AppView) => void;
   onLogout: () => void;
 }
 
-export function Sidebar({ user, workspace, onLogout }: SidebarProps) {
+export function Sidebar({
+  user,
+  workspace,
+  activeView,
+  onNavigate,
+  onLogout,
+}: SidebarProps) {
   return (
     <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-white/7 bg-[#090d16] px-3 py-4 lg:flex">
       <div className="flex items-center gap-3 px-3 py-2">
@@ -53,24 +67,24 @@ export function Sidebar({ user, workspace, onLogout }: SidebarProps) {
         <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
           Workspace
         </p>
-        {navigation.map(({ label, icon: Icon, active, badge }) => (
-          <button
-            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
-              active
-                ? "bg-cyan-400/8 text-cyan-200"
-                : "text-slate-500 hover:bg-white/[0.04] hover:text-slate-300"
-            }`}
-            key={label}
-          >
-            <Icon className="size-4" />
-            <span>{label}</span>
-            {badge && (
-              <span className="ml-auto rounded-md border border-white/8 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-slate-600">
-                {badge}
-              </span>
-            )}
-          </button>
-        ))}
+        {navigation.map(({ id, label, icon: Icon }) => {
+          const active = activeView === id;
+          return (
+            <button
+              className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
+                active
+                  ? "bg-cyan-400/8 text-cyan-200"
+                  : "text-slate-500 hover:bg-white/[0.04] hover:text-slate-300"
+              }`}
+              key={id}
+              type="button"
+              onClick={() => onNavigate(id)}
+            >
+              <Icon className="size-4" />
+              <span>{label}</span>
+            </button>
+          );
+        })}
       </nav>
 
       <div className="mt-auto">
@@ -80,14 +94,18 @@ export function Sidebar({ user, workspace, onLogout }: SidebarProps) {
             Signed in as {user.display_name}
           </div>
           <p className="mt-1.5 text-[10px] leading-4 text-slate-600">
-            Knowledge is isolated to your workspace membership.
+            One screen at a time — switch views in the sidebar.
           </p>
         </div>
-        <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-500 transition hover:bg-white/[0.04] hover:text-slate-300">
+        <button
+          type="button"
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-500 transition hover:bg-white/[0.04] hover:text-slate-300"
+        >
           <Settings className="size-4" />
           Settings
         </button>
         <button
+          type="button"
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-500 transition hover:bg-white/[0.04] hover:text-red-300"
           onClick={onLogout}
         >

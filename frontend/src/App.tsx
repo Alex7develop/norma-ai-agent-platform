@@ -7,7 +7,9 @@ import {
   type ChatMessage,
 } from "./components/ChatWorkspace";
 import { KnowledgePanel } from "./components/KnowledgePanel";
-import { Sidebar } from "./components/Sidebar";
+import { KnowledgeWorkspace } from "./components/KnowledgeWorkspace";
+import { Sidebar, type AppView } from "./components/Sidebar";
+import { WorkflowsWorkspace } from "./components/WorkflowsWorkspace";
 import {
   ApiError,
   askAssistant,
@@ -33,6 +35,7 @@ function errorMessage(error: unknown): string {
 export function App() {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [booting, setBooting] = useState(true);
+  const [view, setView] = useState<AppView>("assistant");
   const [documentCache, setDocumentCache] = useState<{
     workspaceId: string | null;
     documents: KnowledgeDocument[];
@@ -228,6 +231,7 @@ export function App() {
     setMessages([]);
     setConversationId(null);
     setLaunchRun(null);
+    setView("assistant");
   }
 
   if (booting) {
@@ -246,6 +250,7 @@ export function App() {
           setMessages([]);
           setConversationId(null);
           setError(null);
+          setView("assistant");
         }}
       />
     );
@@ -256,24 +261,43 @@ export function App() {
       <Sidebar
         user={session.user}
         workspace={workspace}
+        activeView={view}
+        onNavigate={setView}
         onLogout={() => void handleLogout()}
       />
-      <ChatWorkspace
-        messages={messages}
-        thinking={thinking}
-        documentsCount={documents.length}
-        launchRunning={launchRunning}
-        launchRun={launchRun}
-        onSend={handleSend}
-        onLaunchStrategy={handleLaunchStrategy}
-      />
-      <KnowledgePanel
-        documents={documents}
-        loading={loadingDocuments}
-        uploading={uploading}
-        onUpload={handleUpload}
-        onDelete={handleDelete}
-      />
+      {view === "assistant" && (
+        <>
+          <ChatWorkspace
+            messages={messages}
+            thinking={thinking}
+            documentsCount={documents.length}
+            onSend={handleSend}
+          />
+          <KnowledgePanel
+            documents={documents}
+            loading={loadingDocuments}
+            uploading={uploading}
+            onUpload={handleUpload}
+            onDelete={handleDelete}
+          />
+        </>
+      )}
+      {view === "workflows" && (
+        <WorkflowsWorkspace
+          running={launchRunning}
+          run={launchRun}
+          onRun={handleLaunchStrategy}
+        />
+      )}
+      {view === "knowledge" && (
+        <KnowledgeWorkspace
+          documents={documents}
+          loading={loadingDocuments}
+          uploading={uploading}
+          onUpload={handleUpload}
+          onDelete={handleDelete}
+        />
+      )}
       {error && (
         <div className="fixed bottom-5 left-1/2 z-50 flex max-w-md -translate-x-1/2 items-center gap-3 rounded-xl border border-red-400/15 bg-[#1a1118] px-4 py-3 text-xs text-red-200 shadow-2xl shadow-black/50">
           <AlertCircle className="size-4 shrink-0 text-red-400" />
