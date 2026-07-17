@@ -56,12 +56,8 @@ class KnowledgeService:
         self.embeddings = embeddings
         self.vectors = vectors
 
-    async def _to_result(self, document: Document) -> IndexedDocument:
-        chunk_count = await self.session.scalar(
-            select(func.count(DocumentChunk.id)).where(
-                DocumentChunk.document_id == document.id
-            )
-        )
+    @staticmethod
+    def _build_result(document: Document, chunk_count: int) -> IndexedDocument:
         return IndexedDocument(
             id=document.id,
             workspace_id=document.workspace_id,
@@ -70,9 +66,34 @@ class KnowledgeService:
             size_bytes=document.size_bytes,
             sha256=document.sha256,
             status=document.status.value,
-            chunk_count=int(chunk_count or 0),
+            chunk_count=chunk_count,
             created_at=document.created_at,
         )
+
+    async def _to_result(self, document: Document) -> IndexedDocument:
+        chunk_count = await self.session.scalar(
+            select(func.count(DocumentChunk.id)).where(
+                DocumentChunk.document_id == document.id
+            )
+        )
+        return self._build_result(document, int(chunk_count or 0))
+
+    async def list_documents(self, *, workspace_id: UUID) -> list[IndexedDocument]:
+        """List newest documents inside one workspace."""
+
+        rows = (
+            await self.session.execute(
+                select(Document, func.count(DocumentChunk.id))
+                .outerjoin(DocumentChunk, DocumentChunk.document_id == Document.id)
+                .where(Document.workspace_id == workspace_id)
+                .group_by(Document.id)
+                .order_by(Document.created_at.desc())
+            )
+        ).all()
+        return [
+            self._build_result(document, int(chunk_count))
+            for document, chunk_count in rows
+        ]
 
     async def ingest(
         self,

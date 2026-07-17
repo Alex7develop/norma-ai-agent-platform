@@ -56,6 +56,15 @@ details do not leak into the graph. Conversation memory, tools, planning, and
 multi-agent delegation remain separate future capabilities rather than hidden
 behavior in the first assistant.
 
+## Frontend workspace
+
+The React client consumes only versioned API contracts. It keeps a generated
+workspace UUID in local storage for the pre-authentication MVP, lists and
+manages indexed documents, and renders assistant source metadata alongside each
+answer. The UUID is a namespace convenience, not an authorization boundary;
+the backend must derive workspace identity from authenticated claims before
+multi-user deployment.
+
 ## Scaling path
 
 1. Add Alembic migrations, tenant-aware identity, and request observability.

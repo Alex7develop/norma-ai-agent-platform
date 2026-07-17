@@ -21,6 +21,7 @@ htmlcov/
 # Frontend
 frontend/node_modules/
 frontend/dist/
+frontend/*.tsbuildinfo
 
 # Editors and OS
 .DS_Store

@@ -537,7 +537,7 @@ Status: Foundation Ready
 ## Phase 4 — Product
 
 
-- [ ] React interface
+- [x] React knowledge and assistant workspace
 - [ ] Authentication
 - [ ] User projects
 - [ ] Knowledge spaces
@@ -579,6 +579,11 @@ therefore take several minutes.
 The first agent endpoint is `POST /api/v1/assistant/query`. It runs a stateless
 LangGraph workflow, retrieves only the requested workspace, and returns an
 OpenRouter-generated answer together with explicit source metadata.
+
+The React workspace at `http://localhost:5173` provides document upload,
+document management, assistant chat, and cited source display. Until
+authentication is introduced, it creates one local workspace UUID in the
+browser.
 
 For backend development without Docker:
 

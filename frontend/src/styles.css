@@ -13,4 +13,36 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background: #080c14;
+}
+
+button,
+textarea,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+::selection {
+  background: rgb(34 211 238 / 25%);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgb(148 163 184 / 12%);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(148 163 184 / 22%);
 }

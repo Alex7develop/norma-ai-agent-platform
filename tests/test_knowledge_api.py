@@ -11,6 +11,9 @@ from app.services.knowledge import IndexedDocument
 
 
 class FakeKnowledgeService:
+    async def list_documents(self, **_: object) -> list[IndexedDocument]:
+        return []
+
     async def ingest(self, **kwargs: object) -> IndexedDocument:
         workspace_id = kwargs["workspace_id"]
         data = kwargs["data"]
@@ -26,6 +29,21 @@ class FakeKnowledgeService:
             chunk_count=1,
             created_at=datetime.now(UTC),
         )
+
+
+def test_list_documents_contract() -> None:
+    app.dependency_overrides[get_knowledge_service] = FakeKnowledgeService
+    try:
+        with TestClient(app) as client:
+            response = client.get(
+                "/api/v1/knowledge/documents",
+                params={"workspace_id": str(uuid4())},
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json() == []
 
 
 def test_upload_document_contract() -> None:

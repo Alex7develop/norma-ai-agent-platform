@@ -42,6 +42,17 @@ def get_knowledge_service(
     return KnowledgeService(session)
 
 
+@router.get("/documents", response_model=list[DocumentResponse])
+async def list_documents(
+    workspace_id: UUID,
+    service: Annotated[KnowledgeService, Depends(get_knowledge_service)],
+) -> list[DocumentResponse]:
+    """List indexed documents for one workspace."""
+
+    documents = await service.list_documents(workspace_id=workspace_id)
+    return [DocumentResponse.model_validate(document) for document in documents]
+
+
 @router.post(
     "/documents",
     response_model=DocumentResponse,
