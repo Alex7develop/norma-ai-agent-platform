@@ -168,3 +168,44 @@ export function askAssistant(
     body: JSON.stringify({ workspace_id: workspaceId, question }),
   });
 }
+
+export interface WorkflowArtifact {
+  id: string;
+  kind: string;
+  title: string;
+  content_md: string;
+  document_id: string | null;
+  created_at: string;
+}
+
+export interface WorkflowRun {
+  id: string;
+  workspace_id: string;
+  workflow_type: string;
+  status: string;
+  brief: string;
+  product_name: string | null;
+  error: string | null;
+  model: string | null;
+  pack_filename: string | null;
+  document_id: string | null;
+  artifacts: WorkflowArtifact[];
+  created_at: string;
+  updated_at: string;
+}
+
+export function runLaunchStrategy(payload: {
+  workspaceId: string;
+  brief: string;
+  productName?: string;
+}): Promise<WorkflowRun> {
+  return request("/workflows/launch-strategy", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      workspace_id: payload.workspaceId,
+      brief: payload.brief,
+      product_name: payload.productName || null,
+    }),
+  });
+}

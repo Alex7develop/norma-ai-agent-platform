@@ -11,7 +11,9 @@ import {
   User,
 } from "lucide-react";
 
-import type { AssistantSource } from "../lib/api";
+import type { AssistantSource, WorkflowRun } from "../lib/api";
+
+import { LaunchStrategyPanel } from "./LaunchStrategyPanel";
 
 export interface ChatMessage {
   id: string;
@@ -25,7 +27,10 @@ interface ChatWorkspaceProps {
   messages: ChatMessage[];
   thinking: boolean;
   documentsCount: number;
+  launchRunning: boolean;
+  launchRun: WorkflowRun | null;
   onSend: (question: string) => Promise<void>;
+  onLaunchStrategy: (brief: string, productName?: string) => Promise<void>;
 }
 
 const suggestions = [
@@ -38,7 +43,10 @@ export function ChatWorkspace({
   messages,
   thinking,
   documentsCount,
+  launchRunning,
+  launchRun,
   onSend,
+  onLaunchStrategy,
 }: ChatWorkspaceProps) {
   const [question, setQuestion] = useState("");
 
@@ -52,6 +60,11 @@ export function ChatWorkspace({
 
   return (
     <main className="flex min-w-0 flex-1 flex-col bg-[#0b101a]">
+      <LaunchStrategyPanel
+        running={launchRunning}
+        run={launchRun}
+        onRun={onLaunchStrategy}
+      />
       <header className="flex h-[68px] shrink-0 items-center border-b border-white/7 px-4 sm:px-6">
         <button className="mr-3 text-slate-500 lg:hidden">
           <Menu className="size-5" />

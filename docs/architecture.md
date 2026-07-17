@@ -52,9 +52,25 @@ system prompt treats retrieved documents as untrusted context, requires source
 citations, and avoids an LLM call when retrieval returns no evidence.
 
 The selected model is configured through `OPENROUTER_MODEL`; provider-specific
-details do not leak into the graph. Conversation memory, tools, planning, and
-multi-agent delegation remain separate future capabilities rather than hidden
-behavior in the first assistant.
+details do not leak into the graph. Conversation memory and external tool loops
+remain separate future capabilities rather than hidden behavior in the first
+assistant.
+
+## Launch Strategy multi-agent workflow
+
+The second LangGraph workflow coordinates specialist agents for a launch brief:
+
+1. retrieve workspace context
+2. Research Agent synthesizes market and competitor notes
+3. Planning Agent drafts positioning, roadmap, and marketing outline
+4. Execution Agent assembles one markdown pack and ingests it through
+   `KnowledgeService`
+
+Runs and artifacts are persisted (`workflow_runs`, `workflow_artifacts`) for
+auditability. The pack becomes ordinary workspace knowledge, so the RAG
+assistant can cite it on later questions. Live web search, financial models,
+PRD/tech-spec generators, and Redis workers are deferred until this
+brief → agents → knowledge loop is stable.
 
 ## Authentication
 
@@ -68,7 +84,8 @@ workspace enumeration.
 
 The React client consumes only versioned API contracts. It restores the current
 session through `/auth/me`, lists and manages indexed documents for the user's
-first workspace, and renders assistant source metadata alongside each answer.
+first workspace, can trigger Launch Strategy runs, and renders assistant source
+metadata alongside each answer.
 
 ## Scaling path
 

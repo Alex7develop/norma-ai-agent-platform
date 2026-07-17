@@ -526,10 +526,10 @@ Status: Foundation Ready
 
 
 - [x] LangGraph RAG Assistant workflow
-- [ ] Coordinator Agent
-- [ ] Research Agent
+- [x] Coordinator Agent
+- [x] Research Agent
 - [ ] Memory Agent
-- [ ] Execution Agent
+- [x] Execution Agent
 
 
 ---
@@ -580,10 +580,16 @@ The first agent endpoint is `POST /api/v1/assistant/query`. It runs a stateless
 LangGraph workflow, retrieves only the requested workspace, and returns an
 OpenRouter-generated answer together with explicit source metadata.
 
+The first multi-agent workflow is `POST /api/v1/workflows/launch-strategy`.
+A LangGraph coordinator runs Research and Planning agents, then an Execution
+agent assembles a markdown Launch Strategy Pack and ingests it into the
+workspace knowledge base. Load a prior run with
+`GET /api/v1/workflows/runs/{run_id}`.
+
 The React workspace at `http://localhost:5173` provides registration, login,
-document upload, document management, assistant chat, and cited source display.
-Sessions use HttpOnly cookies; knowledge and assistant APIs require membership
-in the requested workspace.
+document upload, document management, Launch Strategy runs, assistant chat, and
+cited source display. Sessions use HttpOnly cookies; knowledge, assistant, and
+workflow APIs require membership in the requested workspace.
 
 For backend development without Docker:
 

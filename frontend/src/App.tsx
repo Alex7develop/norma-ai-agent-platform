@@ -17,7 +17,9 @@ import {
   listDocuments,
   type KnowledgeDocument,
   logout,
+  runLaunchStrategy,
   uploadDocument,
+  type WorkflowRun,
 } from "./lib/api";
 
 function errorMessage(error: unknown): string {
@@ -36,6 +38,8 @@ export function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [uploading, setUploading] = useState(false);
   const [thinking, setThinking] = useState(false);
+  const [launchRunning, setLaunchRunning] = useState(false);
+  const [launchRun, setLaunchRun] = useState<WorkflowRun | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const workspace = session?.workspaces[0] ?? null;
@@ -159,6 +163,25 @@ export function App() {
     }
   }
 
+  async function handleLaunchStrategy(brief: string, productName?: string) {
+    if (!workspaceId) return;
+    setLaunchRunning(true);
+    setError(null);
+    try {
+      const result = await runLaunchStrategy({
+        workspaceId,
+        brief,
+        productName,
+      });
+      setLaunchRun(result);
+      await refreshDocuments();
+    } catch (requestError) {
+      setError(errorMessage(requestError));
+    } finally {
+      setLaunchRunning(false);
+    }
+  }
+
   async function handleLogout() {
     try {
       await logout();
@@ -168,6 +191,7 @@ export function App() {
     setSession(null);
     setDocumentCache({ workspaceId: null, documents: [] });
     setMessages([]);
+    setLaunchRun(null);
   }
 
   if (booting) {
@@ -201,7 +225,10 @@ export function App() {
         messages={messages}
         thinking={thinking}
         documentsCount={documents.length}
+        launchRunning={launchRunning}
+        launchRun={launchRun}
         onSend={handleSend}
+        onLaunchStrategy={handleLaunchStrategy}
       />
       <KnowledgePanel
         documents={documents}
