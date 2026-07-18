@@ -149,8 +149,8 @@ Community: [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) · [
 
 # Roadmap (summary)
 
-Phases 1–4 are complete for the MVP product surface. **Phase 5** targets
-enterprise connectors (Slack, Notion, GitHub, Google Drive, CRM).
+Phases 1–4 are complete for the MVP product surface. **Phase 5** has started
+with **Notion** (OAuth + page import). Remaining: Slack, GitHub, Google Drive, CRM.
 
 Full checklist: [docs/roadmap.md](docs/roadmap.md).
 

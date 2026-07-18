@@ -208,6 +208,67 @@ export function getDocument(
   return request(`/knowledge/documents/${documentId}?${query}`);
 }
 
+export interface NotionStatus {
+  connected: boolean;
+  workspace_name: string | null;
+  workspace_id: string | null;
+}
+
+export interface NotionPage {
+  id: string;
+  title: string;
+}
+
+export interface NotionImportItem {
+  page_id: string;
+  document_id: string | null;
+  filename: string | null;
+  status: string;
+  error: string | null;
+}
+
+export function getNotionAuthorizeUrl(
+  workspaceId: string,
+  spaceId: string,
+): Promise<{ authorize_url: string }> {
+  const query = new URLSearchParams({
+    workspace_id: workspaceId,
+    space_id: spaceId,
+  });
+  return request(`/integrations/notion/authorize?${query}`);
+}
+
+export function getNotionStatus(workspaceId: string): Promise<NotionStatus> {
+  const query = new URLSearchParams({ workspace_id: workspaceId });
+  return request(`/integrations/notion/status?${query}`);
+}
+
+export function disconnectNotion(workspaceId: string): Promise<void> {
+  const query = new URLSearchParams({ workspace_id: workspaceId });
+  return request(`/integrations/notion?${query}`, { method: "DELETE" });
+}
+
+export function listNotionPages(workspaceId: string): Promise<NotionPage[]> {
+  const query = new URLSearchParams({ workspace_id: workspaceId });
+  return request(`/integrations/notion/pages?${query}`);
+}
+
+export function importNotionPages(payload: {
+  workspaceId: string;
+  spaceId: string;
+  pageIds: string[];
+}): Promise<{ items: NotionImportItem[] }> {
+  return request("/integrations/notion/import", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      workspace_id: payload.workspaceId,
+      space_id: payload.spaceId,
+      page_ids: payload.pageIds,
+    }),
+  });
+}
+
 export function uploadDocument(
   workspaceId: string,
   file: File,

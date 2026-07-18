@@ -11,6 +11,7 @@ class Base(DeclarativeBase):
 # Base.metadata without introducing circular imports.
 from app.database import auth_models as auth_models  # noqa: E402, F401
 from app.database import document_models as document_models  # noqa: E402, F401
+from app.database import integration_models as integration_models  # noqa: E402, F401
 from app.database import memory_models as memory_models  # noqa: E402, F401
 from app.database import project_models as project_models  # noqa: E402, F401
 from app.database import workflow_models as workflow_models  # noqa: E402, F401

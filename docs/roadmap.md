@@ -42,7 +42,7 @@ the main branch.
 ## Phase 5 — Enterprise (next)
 
 - [ ] Slack integration
-- [ ] Notion integration
+- [x] Notion integration (OAuth + page import into knowledge spaces)
 - [ ] GitHub integration
 - [ ] Google Drive integration
 - [ ] CRM integrations

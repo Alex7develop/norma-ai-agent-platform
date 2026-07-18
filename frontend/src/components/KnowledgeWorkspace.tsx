@@ -8,12 +8,18 @@ import {
 
 import type { KnowledgeDocument } from "../lib/api";
 
+import { NotionImportPanel } from "./NotionImportPanel";
+
 interface KnowledgeWorkspaceProps {
+  workspaceId: string;
+  spaceId: string;
   documents: KnowledgeDocument[];
   loading: boolean;
   uploading: boolean;
   onUpload: (file: File) => Promise<void>;
   onDelete: (documentId: string) => Promise<void>;
+  onRefreshDocuments: () => Promise<void>;
+  onError: (message: string) => void;
 }
 
 function formatBytes(bytes: number): string {
@@ -23,11 +29,15 @@ function formatBytes(bytes: number): string {
 }
 
 export function KnowledgeWorkspace({
+  workspaceId,
+  spaceId,
   documents,
   loading,
   uploading,
   onUpload,
   onDelete,
+  onRefreshDocuments,
+  onError,
 }: KnowledgeWorkspaceProps) {
   return (
     <main className="flex min-w-0 flex-1 flex-col bg-[#0b101a]">
@@ -39,7 +49,7 @@ export function KnowledgeWorkspace({
           <p className="mt-0.5 text-[10px] text-slate-600">
             {documents.length}{" "}
             {documents.length === 1 ? "document" : "documents"} indexed in this
-            workspace
+            space
           </p>
         </div>
       </header>
@@ -70,6 +80,13 @@ export function KnowledgeWorkspace({
               }}
             />
           </label>
+
+          <NotionImportPanel
+            workspaceId={workspaceId}
+            spaceId={spaceId}
+            onImported={onRefreshDocuments}
+            onError={onError}
+          />
 
           <div className="mt-8">
             {loading ? (

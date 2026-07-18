@@ -58,6 +58,19 @@ routes require workspace membership (missing membership → **404**).
 | GET | `/workflows/runs` | History (`space_id`, `limit`) |
 | GET | `/workflows/runs/{id}` | Full artifacts + `current_step` |
 
+## Integrations — Notion
+
+| Method | Path | Notes |
+|-|-|-|
+| GET | `/integrations/notion/authorize` | `workspace_id`, `space_id` → authorize URL |
+| GET | `/integrations/notion/callback` | OAuth redirect (sets connection, redirects to frontend) |
+| GET | `/integrations/notion/status` | Connected flag + Notion workspace name |
+| DELETE | `/integrations/notion` | Disconnect |
+| GET | `/integrations/notion/pages` | Pages shared with the integration |
+| POST | `/integrations/notion/import` | Import page ids → knowledge ingest **202** |
+
+Requires `NOTION_CLIENT_ID` / `NOTION_CLIENT_SECRET` / `NOTION_REDIRECT_URI`.
+
 ## Conventions
 
 - Tenancy fields: `workspace_id`, often `space_id`  

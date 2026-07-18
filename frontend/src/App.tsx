@@ -122,6 +122,13 @@ export function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("notion") === "connected" || params.get("notion") === "error") {
+      setView("knowledge");
+    }
+  }, []);
+
   const refreshDocuments = useCallback(async () => {
     if (!resolvedWorkspaceId || !resolvedSpaceId) return;
     try {
@@ -507,13 +514,17 @@ export function App() {
           onSelectRun={handleSelectRun}
         />
       )}
-      {view === "knowledge" && (
+      {view === "knowledge" && resolvedSpaceId && (
         <KnowledgeWorkspace
+          workspaceId={resolvedWorkspaceId}
+          spaceId={resolvedSpaceId}
           documents={documents}
           loading={loadingDocuments}
           uploading={uploading}
           onUpload={handleUpload}
           onDelete={handleDelete}
+          onRefreshDocuments={refreshDocuments}
+          onError={(message) => setError(message)}
         />
       )}
       {error && (

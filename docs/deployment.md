@@ -34,6 +34,8 @@ See [`.env.example`](../.env.example):
 - `SECRET_KEY`, cookie/JWT timings
 - `WEB_SEARCH_ENABLED`, `WEB_SEARCH_MAX_RESULTS`
 - `LAUNCH_STRATEGY_QUEUE`
+- `NOTION_CLIENT_ID`, `NOTION_CLIENT_SECRET`, `NOTION_REDIRECT_URI`
+- `FRONTEND_ORIGIN` (OAuth callback redirect target)
 
 ## Health checks
 

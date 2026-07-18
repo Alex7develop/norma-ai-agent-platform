@@ -53,6 +53,12 @@ class Settings(BaseSettings):
     refresh_token_days: int = 30
     access_cookie_name: str = "norma_access"
     refresh_cookie_name: str = "norma_refresh"
+    notion_client_id: str | None = None
+    notion_client_secret: SecretStr | None = None
+    notion_redirect_uri: str = (
+        "http://localhost:8000/api/v1/integrations/notion/callback"
+    )
+    frontend_origin: str = "http://localhost:5173"
 
 
 @lru_cache
