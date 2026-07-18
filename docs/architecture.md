@@ -44,9 +44,11 @@ Within a workspace, knowledge is further isolated by **projects** and
 space (`Main`). Documents, conversations, workflow runs, and workspace memories
 carry a required `space_id`.
 
-The first ingestion path is synchronous and deliberately bounded by file,
-page, character, and batch limits. Long-running Launch Strategy execution uses a
-Redis queue and a dedicated `worker` Compose service.
+Document uploads are async: `POST /knowledge/documents` stores raw bytes in
+`document_uploads`, enqueues a Redis job, and returns **202**. The unified
+`worker` (`python -m app.workers.main`) indexes the file and deletes the upload
+payload. Launch Strategy runs use the same worker and queue. The worker writes a
+Redis heartbeat (`norma:worker:heartbeat`); `/ready` fails when it is missing.
 
 ## First agent workflow
 
@@ -85,7 +87,8 @@ Assistant turns are stored in `conversations` / `conversation_messages`, scoped
 by workspace, knowledge space, and user. Optional `conversation_id` continues a
 thread. Before generation, the RAG workflow receives recent chat turns and
 workspace memory notes as supporting (untrusted) context alongside retrieved
-chunks.
+chunks. Workflow summaries are embedded into Qdrant (`source_type=memory`) and
+retrieved semantically for the current question, with SQL recent-notes fallback.
 
 ## Authentication
 
@@ -98,10 +101,11 @@ workspace enumeration.
 ## Frontend workspace
 
 The React client consumes only versioned API contracts. It restores the current
-session through `/auth/me`, switches project/space in the sidebar, lists and
-manages indexed documents for the selected space, shows Launch Strategy run
-history with polling, and renders assistant source metadata alongside each
-answer.
+session through `/auth/me`, switches workspace/project/space in the sidebar
+(with create project/space), lists and manages indexed documents for the
+selected space (polling pending ingest), shows Launch Strategy run history with
+step pipeline + elapsed time, and renders assistant source metadata alongside
+each answer.
 
 ## Scaling path
 

@@ -16,7 +16,7 @@ class FakeKnowledgeService:
     async def list_documents(self, **_: object) -> list[IndexedDocument]:
         return []
 
-    async def ingest(self, **kwargs: object) -> IndexedDocument:
+    async def enqueue(self, **kwargs: object) -> IndexedDocument:
         workspace_id = kwargs["workspace_id"]
         data = kwargs["data"]
         assert isinstance(data, bytes)
@@ -27,8 +27,21 @@ class FakeKnowledgeService:
             content_type=str(kwargs["content_type"]),
             size_bytes=len(data),
             sha256="a" * 64,
-            status="completed",
-            chunk_count=1,
+            status="pending",
+            chunk_count=0,
+            created_at=datetime.now(UTC),
+        )
+
+    async def get_document(self, **kwargs: object) -> IndexedDocument:
+        return IndexedDocument(
+            id=kwargs["document_id"],  # type: ignore[arg-type]
+            workspace_id=kwargs["workspace_id"],  # type: ignore[arg-type]
+            filename="notes.txt",
+            content_type="text/plain",
+            size_bytes=8,
+            sha256="a" * 64,
+            status="processing",
+            chunk_count=0,
             created_at=datetime.now(UTC),
         )
 
@@ -58,7 +71,7 @@ def test_list_documents_contract() -> None:
     assert response.json() == []
 
 
-def test_upload_document_contract() -> None:
+def test_upload_document_enqueues_async() -> None:
     workspace_id = uuid4()
     space_id = uuid4()
     app.dependency_overrides[get_knowledge_service] = FakeKnowledgeService
@@ -76,8 +89,8 @@ def test_upload_document_contract() -> None:
     finally:
         app.dependency_overrides.pop(get_knowledge_service, None)
 
-    assert response.status_code == 201
+    assert response.status_code == 202
     payload = response.json()
     assert payload["workspace_id"] == str(workspace_id)
-    assert payload["status"] == "completed"
-    assert payload["chunk_count"] == 1
+    assert payload["status"] == "pending"
+    assert payload["chunk_count"] == 0

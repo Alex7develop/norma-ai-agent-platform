@@ -51,6 +51,7 @@ class MemoryAgent:
         workspace_id: UUID,
         space_id: UUID,
         conversation_id: UUID | None,
+        question: str | None = None,
     ) -> tuple[list[ChatTurn], list[str]]:
         chat: list[ChatTurn] = []
         if conversation_id is not None:
@@ -58,6 +59,8 @@ class MemoryAgent:
                 conversation_id=conversation_id
             )
         notes = await self.service.load_workspace_notes(
-            workspace_id=workspace_id, space_id=space_id
+            workspace_id=workspace_id,
+            space_id=space_id,
+            query=question,
         )
         return chat, notes

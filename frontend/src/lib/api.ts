@@ -9,6 +9,7 @@ export interface KnowledgeDocument {
   size_bytes: number;
   sha256: string;
   status: string;
+  error?: string | null;
   chunk_count: number;
   created_at: string;
 }
@@ -166,6 +167,30 @@ export function listProjects(workspaceId: string): Promise<Project[]> {
   return request(`/projects?${query}`);
 }
 
+export function createProject(
+  workspaceId: string,
+  name: string,
+): Promise<Project> {
+  return request("/projects", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ workspace_id: workspaceId, name }),
+  });
+}
+
+export function createSpace(
+  workspaceId: string,
+  projectId: string,
+  name: string,
+): Promise<KnowledgeSpace> {
+  const query = new URLSearchParams({ workspace_id: workspaceId });
+  return request(`/projects/${projectId}/spaces?${query}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+}
+
 export function listDocuments(
   workspaceId: string,
   spaceId?: string | null,
@@ -173,6 +198,14 @@ export function listDocuments(
   const query = new URLSearchParams({ workspace_id: workspaceId });
   if (spaceId) query.set("space_id", spaceId);
   return request(`/knowledge/documents?${query}`);
+}
+
+export function getDocument(
+  workspaceId: string,
+  documentId: string,
+): Promise<KnowledgeDocument> {
+  const query = new URLSearchParams({ workspace_id: workspaceId });
+  return request(`/knowledge/documents/${documentId}?${query}`);
 }
 
 export function uploadDocument(

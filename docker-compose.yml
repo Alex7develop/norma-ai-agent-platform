@@ -42,7 +42,7 @@ services:
       - .env
     environment:
       EMBEDDING_SERVICE_URL: http://embeddings:8001
-    command: ["python", "-m", "app.workers.launch_strategy"]
+    command: ["python", "-m", "app.workers.main"]
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -54,6 +54,18 @@ services:
         condition: service_healthy
       qdrant:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import asyncio,os; from redis.asyncio import Redis; u=os.environ['REDIS_URL'];\nasync def m():\n c=Redis.from_url(u,decode_responses=True);\n v=await c.get('norma:worker:heartbeat');\n await c.aclose();\n raise SystemExit(0 if v else 1)\nasyncio.run(m())",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
     restart: unless-stopped
 
   embeddings:

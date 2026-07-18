@@ -69,7 +69,13 @@ class QdrantVectorStore:
                         distance=models.Distance.COSINE,
                     ),
                 )
-                for field_name in ("workspace_id", "space_id", "document_id"):
+                for field_name in (
+                    "workspace_id",
+                    "space_id",
+                    "document_id",
+                    "source_type",
+                    "memory_id",
+                ):
                     await self.client.create_payload_index(
                         collection_name=self.collection_name,
                         field_name=field_name,

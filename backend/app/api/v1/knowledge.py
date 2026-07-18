@@ -33,6 +33,7 @@ from app.services.knowledge import (
     KnowledgeService,
 )
 from app.services.projects import ProjectService, SpaceNotFound
+from app.services.queue import JobQueue
 
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
@@ -42,7 +43,11 @@ def get_knowledge_service(
 ) -> KnowledgeService:
     """Compose the application service with request-scoped persistence."""
 
-    return KnowledgeService(session)
+    return KnowledgeService(session, queue=JobQueue())
+
+
+def _document_response(result: object) -> DocumentResponse:
+    return DocumentResponse.model_validate(result)
 
 
 @router.get("/documents", response_model=list[DocumentResponse])
@@ -61,13 +66,33 @@ async def list_documents(
     documents = await service.list_documents(
         workspace_id=workspace_id, space_id=space_id
     )
-    return [DocumentResponse.model_validate(document) for document in documents]
+    return [_document_response(document) for document in documents]
+
+
+@router.get("/documents/{document_id}", response_model=DocumentResponse)
+async def get_document(
+    document_id: UUID,
+    workspace_id: UUID,
+    service: Annotated[KnowledgeService, Depends(get_knowledge_service)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> DocumentResponse:
+    await require_workspace_access(
+        session, user_id=user.id, workspace_id=workspace_id
+    )
+    try:
+        result = await service.get_document(
+            workspace_id=workspace_id, document_id=document_id
+        )
+    except KnowledgeDocumentNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return _document_response(result)
 
 
 @router.post(
     "/documents",
     response_model=DocumentResponse,
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def upload_document(
     workspace_id: Annotated[UUID, Form()],
@@ -77,7 +102,7 @@ async def upload_document(
     user: Annotated[User, Depends(get_current_user)],
     space_id: Annotated[UUID | None, Form()] = None,
 ) -> DocumentResponse:
-    """Synchronously parse and index one bounded document."""
+    """Enqueue document indexing and return immediately for polling."""
 
     await require_workspace_access(
         session, user_id=user.id, workspace_id=workspace_id
@@ -104,7 +129,7 @@ async def upload_document(
         raise HTTPException(status_code=413, detail="Document size limit exceeded")
 
     try:
-        result = await service.ingest(
+        result = await service.enqueue(
             workspace_id=workspace_id,
             space_id=resolved_space,
             filename=file.filename,
@@ -115,7 +140,11 @@ async def upload_document(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except KnowledgeIngestionError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    return DocumentResponse.model_validate(result)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503, detail="Failed to enqueue document ingest"
+        ) from exc
+    return _document_response(result)
 
 
 @router.delete(

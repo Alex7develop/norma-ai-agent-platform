@@ -1,3 +1,4 @@
+import { FormEvent, useState } from "react";
 import {
   Bot,
   Boxes,
@@ -5,6 +6,7 @@ import {
   FolderKanban,
   LayoutDashboard,
   LogOut,
+  Plus,
   Settings,
   Sparkles,
 } from "lucide-react";
@@ -25,31 +27,76 @@ const navigation: {
 
 interface SidebarProps {
   user: AuthUser;
-  workspace: AuthWorkspace;
+  workspaces: AuthWorkspace[];
+  workspaceId: string;
   projects: Project[];
   projectId: string | null;
   spaceId: string | null;
   activeView: AppView;
   onNavigate: (view: AppView) => void;
+  onSelectWorkspace: (workspaceId: string) => void;
   onSelectProject: (projectId: string) => void;
   onSelectSpace: (spaceId: string) => void;
+  onCreateProject: (name: string) => Promise<void>;
+  onCreateSpace: (name: string) => Promise<void>;
   onLogout: () => void;
 }
 
 export function Sidebar({
   user,
-  workspace,
+  workspaces,
+  workspaceId,
   projects,
   projectId,
   spaceId,
   activeView,
   onNavigate,
+  onSelectWorkspace,
   onSelectProject,
   onSelectSpace,
+  onCreateProject,
+  onCreateSpace,
   onLogout,
 }: SidebarProps) {
+  const [projectName, setProjectName] = useState("");
+  const [spaceName, setSpaceName] = useState("");
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [creatingSpace, setCreatingSpace] = useState(false);
+  const [showProjectForm, setShowProjectForm] = useState(false);
+  const [showSpaceForm, setShowSpaceForm] = useState(false);
+
+  const workspace =
+    workspaces.find((item) => item.id === workspaceId) ?? workspaces[0];
   const activeProject =
     projects.find((item) => item.id === projectId) ?? projects[0] ?? null;
+
+  async function submitProject(event: FormEvent) {
+    event.preventDefault();
+    const name = projectName.trim();
+    if (!name || creatingProject) return;
+    setCreatingProject(true);
+    try {
+      await onCreateProject(name);
+      setProjectName("");
+      setShowProjectForm(false);
+    } finally {
+      setCreatingProject(false);
+    }
+  }
+
+  async function submitSpace(event: FormEvent) {
+    event.preventDefault();
+    const name = spaceName.trim();
+    if (!name || creatingSpace || !activeProject) return;
+    setCreatingSpace(true);
+    try {
+      await onCreateSpace(name);
+      setSpaceName("");
+      setShowSpaceForm(false);
+    } finally {
+      setCreatingSpace(false);
+    }
+  }
 
   return (
     <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-white/7 bg-[#090d16] px-3 py-4 lg:flex">
@@ -65,27 +112,44 @@ export function Sidebar({
         </div>
       </div>
 
-      <div className="mt-5 flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.035] px-3 py-2.5 text-left">
-        <div className="grid size-8 place-items-center rounded-lg bg-indigo-500/15 text-indigo-300">
-          <LayoutDashboard className="size-4" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-medium text-slate-200">
-            {workspace.name}
-          </p>
-          <p className="truncate text-[10px] text-slate-500">{user.email}</p>
+      <div className="mt-5 space-y-2 rounded-xl border border-white/8 bg-white/[0.035] px-3 py-2.5">
+        <div className="flex items-center gap-3">
+          <div className="grid size-8 place-items-center rounded-lg bg-indigo-500/15 text-indigo-300">
+            <LayoutDashboard className="size-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            {workspaces.length > 1 ? (
+              <select
+                className="w-full truncate bg-transparent text-xs font-medium text-slate-200 outline-none"
+                value={workspaceId}
+                onChange={(event) => onSelectWorkspace(event.target.value)}
+              >
+                {workspaces.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p className="truncate text-xs font-medium text-slate-200">
+                {workspace?.name ?? "Workspace"}
+              </p>
+            )}
+            <p className="truncate text-[10px] text-slate-500">{user.email}</p>
+          </div>
         </div>
       </div>
 
       <div className="mt-4 space-y-2 px-1">
-        <div className="flex items-center gap-2 px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
-          <FolderKanban className="size-3" />
-          Project / Space
+        <div className="flex items-center justify-between px-2">
+          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+            <FolderKanban className="size-3" />
+            Project / Space
+          </div>
         </div>
-        <label className="block px-1">
-          <span className="sr-only">Project</span>
+        <div className="flex items-center gap-1 px-1">
           <select
-            className="w-full rounded-lg border border-white/8 bg-[#0f1522] px-2.5 py-2 text-xs text-slate-200 outline-none focus:border-cyan-400/40"
+            className="min-w-0 flex-1 rounded-lg border border-white/8 bg-[#0f1522] px-2.5 py-2 text-xs text-slate-200 outline-none focus:border-cyan-400/40"
             value={activeProject?.id ?? ""}
             onChange={(event) => onSelectProject(event.target.value)}
             disabled={projects.length === 0}
@@ -96,11 +160,39 @@ export function Sidebar({
               </option>
             ))}
           </select>
-        </label>
-        <label className="block px-1">
-          <span className="sr-only">Knowledge space</span>
+          <button
+            type="button"
+            title="New project"
+            className="grid size-8 shrink-0 place-items-center rounded-lg border border-white/8 text-slate-500 transition hover:border-cyan-400/30 hover:text-cyan-200"
+            onClick={() => {
+              setShowProjectForm((open) => !open);
+              setShowSpaceForm(false);
+            }}
+          >
+            <Plus className="size-3.5" />
+          </button>
+        </div>
+        {showProjectForm && (
+          <form className="flex gap-1 px-1" onSubmit={(e) => void submitProject(e)}>
+            <input
+              className="min-w-0 flex-1 rounded-lg border border-white/8 bg-[#0f1522] px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-400/40"
+              placeholder="Project name"
+              value={projectName}
+              onChange={(event) => setProjectName(event.target.value)}
+              autoFocus
+            />
+            <button
+              type="submit"
+              disabled={!projectName.trim() || creatingProject}
+              className="rounded-lg bg-cyan-500/20 px-2 text-[10px] font-medium text-cyan-200 disabled:opacity-40"
+            >
+              Add
+            </button>
+          </form>
+        )}
+        <div className="flex items-center gap-1 px-1">
           <select
-            className="w-full rounded-lg border border-white/8 bg-[#0f1522] px-2.5 py-2 text-xs text-slate-200 outline-none focus:border-cyan-400/40"
+            className="min-w-0 flex-1 rounded-lg border border-white/8 bg-[#0f1522] px-2.5 py-2 text-xs text-slate-200 outline-none focus:border-cyan-400/40"
             value={spaceId ?? ""}
             onChange={(event) => onSelectSpace(event.target.value)}
             disabled={!activeProject?.spaces.length}
@@ -111,12 +203,42 @@ export function Sidebar({
               </option>
             ))}
           </select>
-        </label>
+          <button
+            type="button"
+            title="New space"
+            className="grid size-8 shrink-0 place-items-center rounded-lg border border-white/8 text-slate-500 transition hover:border-cyan-400/30 hover:text-cyan-200"
+            disabled={!activeProject}
+            onClick={() => {
+              setShowSpaceForm((open) => !open);
+              setShowProjectForm(false);
+            }}
+          >
+            <Plus className="size-3.5" />
+          </button>
+        </div>
+        {showSpaceForm && (
+          <form className="flex gap-1 px-1" onSubmit={(e) => void submitSpace(e)}>
+            <input
+              className="min-w-0 flex-1 rounded-lg border border-white/8 bg-[#0f1522] px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-400/40"
+              placeholder="Space name"
+              value={spaceName}
+              onChange={(event) => setSpaceName(event.target.value)}
+              autoFocus
+            />
+            <button
+              type="submit"
+              disabled={!spaceName.trim() || creatingSpace}
+              className="rounded-lg bg-cyan-500/20 px-2 text-[10px] font-medium text-cyan-200 disabled:opacity-40"
+            >
+              Add
+            </button>
+          </form>
+        )}
       </div>
 
       <nav className="mt-6 space-y-1">
         <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
-          Workspace
+          Navigate
         </p>
         {navigation.map(({ id, label, icon: Icon }) => {
           const active = activeView === id;

@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -86,6 +87,31 @@ class Document(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    upload: Mapped["DocumentUpload | None"] = relationship(
+        back_populates="document",
+        cascade="all, delete-orphan",
+        uselist=False,
+        passive_deletes=True,
+    )
+
+
+class DocumentUpload(Base):
+    """Ephemeral raw bytes for a pending async ingest job."""
+
+    __tablename__ = "document_uploads"
+
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    document: Mapped[Document] = relationship(back_populates="upload")
 
 
 class DocumentChunk(Base):

@@ -15,6 +15,10 @@ from app.database.memory_models import (
     MessageRole,
     WorkspaceMemory,
 )
+from app.rag.container import embedding_provider, retriever, vector_store
+from app.rag.embeddings import EmbeddingProvider
+from app.rag.retriever import Retriever
+from app.rag.vectorstore import VectorRecord, VectorStore
 
 
 class ConversationNotFound(LookupError):
@@ -30,8 +34,18 @@ class ChatTurn:
 class MemoryService:
     """Application service for chat history and workspace notes."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        embeddings: EmbeddingProvider = embedding_provider,
+        vectors: VectorStore = vector_store,
+        notes_retriever: Retriever = retriever,
+    ) -> None:
         self.session = session
+        self.embeddings = embeddings
+        self.vectors = vectors
+        self.notes_retriever = notes_retriever
 
     async def get_or_create_conversation(
         self,
@@ -123,15 +137,37 @@ class MemoryService:
         run_id: UUID,
         summary_md: str,
     ) -> WorkspaceMemory:
+        content = summary_md.strip()
         memory = WorkspaceMemory(
             workspace_id=workspace_id,
             space_id=space_id,
             kind=MemoryKind.WORKFLOW_SUMMARY,
-            content=summary_md.strip(),
+            content=content,
             source_run_id=run_id,
         )
         self.session.add(memory)
         await self.session.flush()
+        try:
+            vector = await self.embeddings.embed_query(content)
+            await self.vectors.upsert(
+                [
+                    VectorRecord(
+                        id=str(memory.id),
+                        vector=vector,
+                        metadata={
+                            "source_type": "memory",
+                            "workspace_id": str(workspace_id),
+                            "space_id": str(space_id),
+                            "memory_id": str(memory.id),
+                            "kind": memory.kind.value,
+                            "content": content,
+                        },
+                    )
+                ]
+            )
+        except Exception:
+            # Relational memory remains useful even if embedding fails.
+            pass
         return memory
 
     async def load_workspace_notes(
@@ -139,8 +175,24 @@ class MemoryService:
         *,
         workspace_id: UUID,
         space_id: UUID | None = None,
+        query: str | None = None,
         limit: int = 5,
     ) -> list[str]:
+        if query:
+            try:
+                hits = await self.notes_retriever.retrieve(
+                    query,
+                    workspace_id=str(workspace_id),
+                    space_id=str(space_id) if space_id else None,
+                    source_type="memory",
+                    limit=limit,
+                )
+                notes = [hit.content for hit in hits if hit.content.strip()]
+                if notes:
+                    return notes
+            except Exception:
+                pass
+
         filters = [WorkspaceMemory.workspace_id == workspace_id]
         if space_id is not None:
             filters.append(WorkspaceMemory.space_id == space_id)

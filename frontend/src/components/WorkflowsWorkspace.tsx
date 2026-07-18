@@ -1,7 +1,8 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
+  Circle,
   FileText,
   LoaderCircle,
   Rocket,
@@ -14,6 +15,17 @@ import type {
 } from "../lib/api";
 
 import { ArtifactReader } from "./ArtifactReader";
+
+const PIPELINE_STEPS = [
+  "queued",
+  "retrieve",
+  "research",
+  "planning",
+  "spec",
+  "content",
+  "persist",
+  "done",
+] as const;
 
 interface WorkflowsWorkspaceProps {
   runs: WorkflowRunSummary[];
@@ -28,6 +40,21 @@ function statusLabel(run: WorkflowRunSummary | WorkflowRun): string {
     return run.current_step ? `${run.status} · ${run.current_step}` : run.status;
   }
   return run.status;
+}
+
+function normalizeStep(step: string | null | undefined): string {
+  if (!step) return "queued";
+  if (step === "starting") return "queued";
+  if (step === "failed") return "persist";
+  return step;
+}
+
+function formatElapsed(startedAt: string, nowMs: number): string {
+  const started = new Date(startedAt).getTime();
+  const seconds = Math.max(0, Math.floor((nowMs - started) / 1000));
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
 }
 
 export function WorkflowsWorkspace({
@@ -46,6 +73,7 @@ export function WorkflowsWorkspace({
     kind: string;
   } | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const artifacts = useMemo(() => activeRun?.artifacts ?? [], [activeRun]);
   const selectedKind =
@@ -64,6 +92,17 @@ export function WorkflowsWorkspace({
     enqueueing ||
     activeRun?.status === "pending" ||
     activeRun?.status === "running";
+
+  const currentStep = normalizeStep(activeRun?.current_step);
+  const currentIndex = PIPELINE_STEPS.indexOf(
+    currentStep as (typeof PIPELINE_STEPS)[number],
+  );
+
+  useEffect(() => {
+    if (!busy) return;
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [busy]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -101,6 +140,7 @@ export function WorkflowsWorkspace({
             )}
             <span className="max-w-[320px] truncate">
               {activeRun.product_name ?? "Run"} · {statusLabel(activeRun)}
+              {busy ? ` · ${formatElapsed(activeRun.created_at, nowMs)}` : ""}
             </span>
           </div>
         )}
@@ -146,6 +186,55 @@ export function WorkflowsWorkspace({
               )}
             </button>
           </form>
+
+          {(busy || activeRun?.status === "failed") && activeRun && (
+            <div className="shrink-0 border-b border-white/7 px-4 py-3">
+              {activeRun.status === "failed" && activeRun.error && (
+                <div className="mb-3 flex items-start gap-2 rounded-lg border border-red-400/20 bg-red-400/5 px-3 py-2 text-[11px] text-red-200">
+                  <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
+                  <span>{activeRun.error}</span>
+                </div>
+              )}
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+                Pipeline
+                {busy
+                  ? ` · ${formatElapsed(activeRun.created_at, nowMs)}`
+                  : ""}
+              </p>
+              <ol className="space-y-1">
+                {PIPELINE_STEPS.map((step, index) => {
+                  const done =
+                    activeRun.status === "completed" ||
+                    (currentIndex >= 0 && index < currentIndex);
+                  const current =
+                    busy &&
+                    (currentIndex === index ||
+                      (currentIndex < 0 && step === "queued"));
+                  return (
+                    <li
+                      key={step}
+                      className={`flex items-center gap-2 text-[11px] ${
+                        current
+                          ? "text-amber-200"
+                          : done
+                            ? "text-emerald-300/80"
+                            : "text-slate-600"
+                      }`}
+                    >
+                      {done ? (
+                        <CheckCircle2 className="size-3" />
+                      ) : current ? (
+                        <LoaderCircle className="size-3 animate-spin" />
+                      ) : (
+                        <Circle className="size-3" />
+                      )}
+                      <span className="capitalize">{step}</span>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          )}
 
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
             <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">

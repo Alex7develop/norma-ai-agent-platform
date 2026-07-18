@@ -58,15 +58,27 @@ async def _check_embeddings() -> None:
         response.raise_for_status()
 
 
+async def _check_worker() -> None:
+    from app.services.queue import JobQueue
+
+    queue = JobQueue()
+    try:
+        if not await queue.heartbeat_alive():
+            raise RuntimeError("Worker heartbeat missing")
+    finally:
+        await queue.close()
+
+
 async def check_dependencies() -> ReadinessReport:
     """Check required infrastructure concurrently with bounded latency."""
 
-    names = ("postgres", "redis", "qdrant", "embeddings")
+    names = ("postgres", "redis", "qdrant", "embeddings", "worker")
     checks = (
         _check_postgres(),
         _check_redis(),
         _check_qdrant(),
         _check_embeddings(),
+        _check_worker(),
     )
     results = await asyncio.gather(
         *(asyncio.wait_for(check, timeout=3) for check in checks),

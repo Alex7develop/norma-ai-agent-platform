@@ -96,6 +96,7 @@ async def query_assistant(
             workspace_id=payload.workspace_id,
             space_id=space_id,
             conversation_id=conversation.id,
+            question=payload.question,
         )
         result = await agent.answer(
             workspace_id=str(payload.workspace_id),

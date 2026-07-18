@@ -20,6 +20,7 @@ class FakeRetriever:
         *,
         workspace_id: str,
         space_id: str | None = None,
+        source_type: str | None = "document",
         limit: int = 10,
     ) -> list[RetrievedDocument]:
         return self.documents[:limit]

@@ -19,6 +19,7 @@ class DocumentResponse(BaseModel):
     size_bytes: int
     sha256: str
     status: str
+    error: str | None = None
     chunk_count: int
     created_at: datetime
 

@@ -1,6 +1,7 @@
 """Redis-backed job queue for long-running workflows."""
 
 import json
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -10,6 +11,8 @@ from redis.exceptions import TimeoutError as RedisTimeoutError
 from app.core.config import settings
 
 LAUNCH_STRATEGY_JOB = "launch_strategy"
+KNOWLEDGE_INGEST_JOB = "knowledge_ingest"
+WORKER_HEARTBEAT_KEY = "norma:worker:heartbeat"
 
 
 class JobQueue:
@@ -45,6 +48,13 @@ class JobQueue:
         payload = json.dumps({"type": LAUNCH_STRATEGY_JOB, "run_id": str(run_id)})
         await client.lpush(self.queue_name, payload)
 
+    async def enqueue_knowledge_ingest(self, *, document_id: UUID) -> None:
+        client = await self.connect()
+        payload = json.dumps(
+            {"type": KNOWLEDGE_INGEST_JOB, "document_id": str(document_id)}
+        )
+        await client.lpush(self.queue_name, payload)
+
     async def dequeue(self, *, timeout_seconds: int = 5) -> dict[str, Any] | None:
         client = await self.connect()
         try:
@@ -55,3 +65,16 @@ class JobQueue:
             return None
         _, raw = item
         return json.loads(raw)
+
+    async def beat(self, *, ttl_seconds: int = 30) -> None:
+        client = await self.connect()
+        await client.set(
+            WORKER_HEARTBEAT_KEY,
+            datetime.now(UTC).isoformat(),
+            ex=ttl_seconds,
+        )
+
+    async def heartbeat_alive(self) -> bool:
+        client = await self.connect()
+        value = await client.get(WORKER_HEARTBEAT_KEY)
+        return value is not None

@@ -29,6 +29,7 @@ class Retriever(Protocol):
         *,
         workspace_id: str,
         space_id: str | None = None,
+        source_type: str | None = "document",
         limit: int = 10,
     ) -> Sequence[RetrievedDocument]:
         """Return the most relevant document chunks."""
@@ -64,6 +65,7 @@ class QdrantRetriever:
         *,
         workspace_id: str,
         space_id: str | None = None,
+        source_type: str | None = "document",
         limit: int = 10,
     ) -> Sequence[RetrievedDocument]:
         """Embed a query and search only inside one workspace/space."""
@@ -76,6 +78,7 @@ class QdrantRetriever:
                 match=models.MatchValue(value=workspace_id),
             )
         ]
+        must_not: list[models.FieldCondition] = []
         if space_id is not None:
             must.append(
                 models.FieldCondition(
@@ -83,10 +86,25 @@ class QdrantRetriever:
                     match=models.MatchValue(value=space_id),
                 )
             )
+        if source_type == "document":
+            # Keep legacy points that predate source_type, exclude memories.
+            must_not.append(
+                models.FieldCondition(
+                    key="source_type",
+                    match=models.MatchValue(value="memory"),
+                )
+            )
+        elif source_type is not None:
+            must.append(
+                models.FieldCondition(
+                    key="source_type",
+                    match=models.MatchValue(value=source_type),
+                )
+            )
         result = await self.client.query_points(
             collection_name=self.collection_name,
             query=query_vector,
-            query_filter=models.Filter(must=must),
+            query_filter=models.Filter(must=must, must_not=must_not or None),
             limit=limit,
             with_payload=True,
         )

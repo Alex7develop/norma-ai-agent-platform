@@ -14,7 +14,10 @@ import {
   ApiError,
   askAssistant,
   type AuthSession,
+  createProject,
+  createSpace,
   deleteDocument,
+  getDocument,
   getSession,
   getWorkflowRun,
   listConversationMessages,
@@ -31,16 +34,31 @@ import {
   uploadDocument,
 } from "./lib/api";
 
+const WORKSPACE_STORAGE_KEY = "norma.workspaceId";
+
 function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
   if (error instanceof Error) return error.message;
   return "Something went wrong";
 }
 
+function pickWorkspaceId(session: AuthSession): string {
+  const stored = localStorage.getItem(WORKSPACE_STORAGE_KEY);
+  if (stored && session.workspaces.some((item) => item.id === stored)) {
+    return stored;
+  }
+  return session.workspaces[0]?.id ?? "";
+}
+
+function isTerminalDocStatus(status: string): boolean {
+  return status === "completed" || status === "failed";
+}
+
 export function App() {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [booting, setBooting] = useState(true);
   const [view, setView] = useState<AppView>("assistant");
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [spaceId, setSpaceId] = useState<string | null>(null);
@@ -57,8 +75,11 @@ export function App() {
   const [workflowRuns, setWorkflowRuns] = useState<WorkflowRunSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const workspace = session?.workspaces[0] ?? null;
-  const workspaceId = workspace?.id ?? null;
+  const workspace =
+    session?.workspaces.find((item) => item.id === workspaceId) ??
+    session?.workspaces[0] ??
+    null;
+  const resolvedWorkspaceId = workspace?.id ?? null;
   const activeProject =
     projects.find((item) => item.id === projectId) ?? projects[0] ?? null;
   const activeSpace =
@@ -71,11 +92,24 @@ export function App() {
   const loadingDocuments =
     Boolean(resolvedSpaceId) && documentCache.spaceId !== resolvedSpaceId;
 
+  function resetWorkspaceScopedState() {
+    setProjects([]);
+    setProjectId(null);
+    setSpaceId(null);
+    setDocumentCache({ spaceId: null, documents: [] });
+    setMessages([]);
+    setConversationId(null);
+    setLaunchRun(null);
+    setWorkflowRuns([]);
+  }
+
   useEffect(() => {
     let active = true;
     getSession()
       .then((result) => {
-        if (active) setSession(result);
+        if (!active) return;
+        setSession(result);
+        setWorkspaceId(pickWorkspaceId(result) || null);
       })
       .catch(() => {
         if (active) setSession(null);
@@ -89,29 +123,36 @@ export function App() {
   }, []);
 
   const refreshDocuments = useCallback(async () => {
-    if (!workspaceId || !resolvedSpaceId) return;
+    if (!resolvedWorkspaceId || !resolvedSpaceId) return;
     try {
-      const result = await listDocuments(workspaceId, resolvedSpaceId);
+      const result = await listDocuments(resolvedWorkspaceId, resolvedSpaceId);
       setDocumentCache({ spaceId: resolvedSpaceId, documents: result });
     } catch (requestError) {
       setError(errorMessage(requestError));
     }
-  }, [workspaceId, resolvedSpaceId]);
+  }, [resolvedWorkspaceId, resolvedSpaceId]);
 
   const refreshWorkflowRuns = useCallback(async () => {
-    if (!workspaceId) return;
+    if (!resolvedWorkspaceId) return;
     try {
-      const runs = await listWorkflowRuns(workspaceId, resolvedSpaceId);
+      const runs = await listWorkflowRuns(resolvedWorkspaceId, resolvedSpaceId);
       setWorkflowRuns(runs);
     } catch (requestError) {
       setError(errorMessage(requestError));
     }
-  }, [workspaceId, resolvedSpaceId]);
+  }, [resolvedWorkspaceId, resolvedSpaceId]);
+
+  const refreshProjects = useCallback(async () => {
+    if (!resolvedWorkspaceId) return;
+    const result = await listProjects(resolvedWorkspaceId);
+    setProjects(result);
+    return result;
+  }, [resolvedWorkspaceId]);
 
   useEffect(() => {
-    if (!workspaceId) return;
+    if (!resolvedWorkspaceId) return;
     let active = true;
-    void listProjects(workspaceId)
+    void listProjects(resolvedWorkspaceId)
       .then((result) => {
         if (!active) return;
         setProjects(result);
@@ -125,12 +166,12 @@ export function App() {
     return () => {
       active = false;
     };
-  }, [workspaceId]);
+  }, [resolvedWorkspaceId]);
 
   useEffect(() => {
-    if (!workspaceId || !resolvedSpaceId) return;
+    if (!resolvedWorkspaceId || !resolvedSpaceId) return;
     let active = true;
-    void listDocuments(workspaceId, resolvedSpaceId)
+    void listDocuments(resolvedWorkspaceId, resolvedSpaceId)
       .then((result) => {
         if (active) setDocumentCache({ spaceId: resolvedSpaceId, documents: result });
       })
@@ -140,7 +181,7 @@ export function App() {
         setDocumentCache({ spaceId: resolvedSpaceId, documents: [] });
       });
 
-    void listConversations(workspaceId, resolvedSpaceId)
+    void listConversations(resolvedWorkspaceId, resolvedSpaceId)
       .then(async (conversations) => {
         if (!active || conversations.length === 0) {
           if (active) {
@@ -150,7 +191,10 @@ export function App() {
           return;
         }
         const latest = conversations[0];
-        const history = await listConversationMessages(workspaceId, latest.id);
+        const history = await listConversationMessages(
+          resolvedWorkspaceId,
+          latest.id,
+        );
         if (!active) return;
         setConversationId(latest.id);
         setMessages(
@@ -171,23 +215,58 @@ export function App() {
     return () => {
       active = false;
     };
-  }, [workspaceId, resolvedSpaceId, refreshWorkflowRuns]);
+  }, [resolvedWorkspaceId, resolvedSpaceId, refreshWorkflowRuns]);
 
   useEffect(() => {
     if (
-      !workspaceId ||
+      !resolvedWorkspaceId ||
       !launchRun ||
       (launchRun.status !== "pending" && launchRun.status !== "running")
     ) {
       return;
     }
     const timer = window.setInterval(() => {
-      void getWorkflowRun(workspaceId, launchRun.id)
+      void getWorkflowRun(resolvedWorkspaceId, launchRun.id)
         .then((result) => {
           setLaunchRun(result);
-          if (result.status === "completed" || result.status === "failed") {
-            void refreshWorkflowRuns();
-            if (result.status === "completed") void refreshDocuments();
+          void refreshWorkflowRuns();
+          if (result.status === "completed") void refreshDocuments();
+        })
+        .catch((requestError: unknown) => {
+          setError(errorMessage(requestError));
+        });
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [
+    resolvedWorkspaceId,
+    launchRun,
+    refreshDocuments,
+    refreshWorkflowRuns,
+  ]);
+
+  useEffect(() => {
+    if (!resolvedWorkspaceId || !resolvedSpaceId) return;
+    const pending = documents.filter(
+      (doc) => !isTerminalDocStatus(doc.status),
+    );
+    if (pending.length === 0) return;
+    const timer = window.setInterval(() => {
+      void Promise.all(
+        pending.map((doc) => getDocument(resolvedWorkspaceId, doc.id)),
+      )
+        .then((updated) => {
+          setDocumentCache((current) => {
+            if (current.spaceId !== resolvedSpaceId) return current;
+            const byId = new Map(updated.map((item) => [item.id, item]));
+            return {
+              spaceId: resolvedSpaceId,
+              documents: current.documents.map(
+                (item) => byId.get(item.id) ?? item,
+              ),
+            };
+          });
+          if (updated.every((item) => isTerminalDocStatus(item.status))) {
+            void refreshDocuments();
           }
         })
         .catch((requestError: unknown) => {
@@ -195,15 +274,25 @@ export function App() {
         });
     }, 2000);
     return () => window.clearInterval(timer);
-  }, [workspaceId, launchRun, refreshDocuments, refreshWorkflowRuns]);
+  }, [documents, resolvedWorkspaceId, resolvedSpaceId, refreshDocuments]);
 
   async function handleUpload(file: File) {
-    if (!workspaceId || !resolvedSpaceId) return;
+    if (!resolvedWorkspaceId || !resolvedSpaceId) return;
     setUploading(true);
     setError(null);
     try {
-      await uploadDocument(workspaceId, file, resolvedSpaceId);
-      await refreshDocuments();
+      const created = await uploadDocument(
+        resolvedWorkspaceId,
+        file,
+        resolvedSpaceId,
+      );
+      setDocumentCache((current) => ({
+        spaceId: resolvedSpaceId,
+        documents: [
+          created,
+          ...(current.spaceId === resolvedSpaceId ? current.documents : []),
+        ],
+      }));
     } catch (requestError) {
       setError(errorMessage(requestError));
     } finally {
@@ -212,14 +301,14 @@ export function App() {
   }
 
   async function handleDelete(documentId: string) {
-    if (!workspaceId || !resolvedSpaceId) return;
+    if (!resolvedWorkspaceId || !resolvedSpaceId) return;
     const snapshot = documentCache;
     setDocumentCache({
       spaceId: resolvedSpaceId,
       documents: documents.filter((document) => document.id !== documentId),
     });
     try {
-      await deleteDocument(workspaceId, documentId);
+      await deleteDocument(resolvedWorkspaceId, documentId);
     } catch (requestError) {
       setDocumentCache(snapshot);
       setError(errorMessage(requestError));
@@ -227,7 +316,7 @@ export function App() {
   }
 
   async function handleSend(question: string) {
-    if (!workspaceId || !resolvedSpaceId) return;
+    if (!resolvedWorkspaceId || !resolvedSpaceId) return;
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
@@ -239,7 +328,7 @@ export function App() {
 
     try {
       const response = await askAssistant(
-        workspaceId,
+        resolvedWorkspaceId,
         question,
         conversationId,
         resolvedSpaceId,
@@ -272,12 +361,12 @@ export function App() {
   }
 
   async function handleEnqueue(brief: string, productName?: string) {
-    if (!workspaceId) return;
+    if (!resolvedWorkspaceId) return;
     setEnqueueing(true);
     setError(null);
     try {
       const result = await runLaunchStrategy({
-        workspaceId,
+        workspaceId: resolvedWorkspaceId,
         brief,
         productName,
         spaceId: resolvedSpaceId,
@@ -292,12 +381,42 @@ export function App() {
   }
 
   async function handleSelectRun(runId: string) {
-    if (!workspaceId) return;
+    if (!resolvedWorkspaceId) return;
     try {
-      const result = await getWorkflowRun(workspaceId, runId);
+      const result = await getWorkflowRun(resolvedWorkspaceId, runId);
       setLaunchRun(result);
     } catch (requestError) {
       setError(errorMessage(requestError));
+    }
+  }
+
+  async function handleCreateProject(name: string) {
+    if (!resolvedWorkspaceId) return;
+    try {
+      const project = await createProject(resolvedWorkspaceId, name);
+      const next = await refreshProjects();
+      setProjectId(project.id);
+      setSpaceId(project.spaces[0]?.id ?? next?.[0]?.spaces[0]?.id ?? null);
+    } catch (requestError) {
+      setError(errorMessage(requestError));
+      throw requestError;
+    }
+  }
+
+  async function handleCreateSpace(name: string) {
+    if (!resolvedWorkspaceId || !activeProject) return;
+    try {
+      const space = await createSpace(
+        resolvedWorkspaceId,
+        activeProject.id,
+        name,
+      );
+      await refreshProjects();
+      setProjectId(activeProject.id);
+      setSpaceId(space.id);
+    } catch (requestError) {
+      setError(errorMessage(requestError));
+      throw requestError;
     }
   }
 
@@ -307,15 +426,10 @@ export function App() {
     } catch {
       // Clear local session even if the revoke request fails.
     }
+    localStorage.removeItem(WORKSPACE_STORAGE_KEY);
     setSession(null);
-    setProjects([]);
-    setProjectId(null);
-    setSpaceId(null);
-    setDocumentCache({ spaceId: null, documents: [] });
-    setMessages([]);
-    setConversationId(null);
-    setLaunchRun(null);
-    setWorkflowRuns([]);
+    setWorkspaceId(null);
+    resetWorkspaceScopedState();
     setView("assistant");
   }
 
@@ -327,13 +441,13 @@ export function App() {
     );
   }
 
-  if (!session || !workspace) {
+  if (!session || !workspace || !resolvedWorkspaceId) {
     return (
       <AuthScreen
         onAuthenticated={(next) => {
           setSession(next);
-          setMessages([]);
-          setConversationId(null);
+          setWorkspaceId(pickWorkspaceId(next) || null);
+          resetWorkspaceScopedState();
           setError(null);
           setView("assistant");
         }}
@@ -345,18 +459,26 @@ export function App() {
     <div className="flex h-screen overflow-hidden bg-[#080c14] text-slate-200">
       <Sidebar
         user={session.user}
-        workspace={workspace}
+        workspaces={session.workspaces}
+        workspaceId={resolvedWorkspaceId}
         projects={projects}
         projectId={activeProject?.id ?? null}
         spaceId={resolvedSpaceId}
         activeView={view}
         onNavigate={setView}
+        onSelectWorkspace={(id) => {
+          localStorage.setItem(WORKSPACE_STORAGE_KEY, id);
+          setWorkspaceId(id);
+          resetWorkspaceScopedState();
+        }}
         onSelectProject={(id) => {
           setProjectId(id);
           const project = projects.find((item) => item.id === id);
           setSpaceId(project?.spaces[0]?.id ?? null);
         }}
         onSelectSpace={setSpaceId}
+        onCreateProject={handleCreateProject}
+        onCreateSpace={handleCreateSpace}
         onLogout={() => void handleLogout()}
       />
       {view === "assistant" && (
