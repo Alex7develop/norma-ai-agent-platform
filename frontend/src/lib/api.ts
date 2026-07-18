@@ -385,6 +385,24 @@ export function runLaunchStrategy(payload: {
   });
 }
 
+export function runResearchBrief(payload: {
+  workspaceId: string;
+  brief: string;
+  productName?: string;
+  spaceId?: string | null;
+}): Promise<WorkflowRun> {
+  return request("/workflows/research-brief", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      workspace_id: payload.workspaceId,
+      brief: payload.brief,
+      product_name: payload.productName || null,
+      space_id: payload.spaceId ?? null,
+    }),
+  });
+}
+
 export function listWorkflowRuns(
   workspaceId: string,
   spaceId?: string | null,

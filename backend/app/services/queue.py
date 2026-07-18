@@ -11,6 +11,7 @@ from redis.exceptions import TimeoutError as RedisTimeoutError
 from app.core.config import settings
 
 LAUNCH_STRATEGY_JOB = "launch_strategy"
+RESEARCH_BRIEF_JOB = "research_brief"
 KNOWLEDGE_INGEST_JOB = "knowledge_ingest"
 WORKER_HEARTBEAT_KEY = "norma:worker:heartbeat"
 
@@ -46,6 +47,11 @@ class JobQueue:
     async def enqueue_launch_strategy(self, *, run_id: UUID) -> None:
         client = await self.connect()
         payload = json.dumps({"type": LAUNCH_STRATEGY_JOB, "run_id": str(run_id)})
+        await client.lpush(self.queue_name, payload)
+
+    async def enqueue_research_brief(self, *, run_id: UUID) -> None:
+        client = await self.connect()
+        payload = json.dumps({"type": RESEARCH_BRIEF_JOB, "run_id": str(run_id)})
         await client.lpush(self.queue_name, payload)
 
     async def enqueue_knowledge_ingest(self, *, document_id: UUID) -> None:

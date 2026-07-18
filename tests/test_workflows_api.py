@@ -21,12 +21,15 @@ class FakeLaunchStrategyService:
     async def enqueue(self, **kwargs: object) -> WorkflowRun:
         self.enqueued.append(kwargs)
         workspace_id = kwargs["workspace_id"]
+        workflow_type = str(
+            kwargs.get("workflow_type") or LaunchStrategyWorkflow.WORKFLOW_TYPE
+        )
         return WorkflowRun(
             id=self.run_id,
             workspace_id=workspace_id,  # type: ignore[arg-type]
             space_id=kwargs["space_id"],  # type: ignore[arg-type]
             user_id=kwargs["user_id"],  # type: ignore[arg-type]
-            workflow_type=LaunchStrategyWorkflow.WORKFLOW_TYPE,
+            workflow_type=workflow_type,
             status=WorkflowStatus.PENDING,
             brief=str(kwargs["brief"]),
             product_name=kwargs.get("product_name"),  # type: ignore[arg-type]
@@ -84,6 +87,56 @@ def test_launch_strategy_enqueues_async() -> None:
     assert payload["product_name"] == "Aussie Roast"
     assert payload["artifacts"] == []
     assert service.enqueued[0]["space_id"] == space_id
+    assert (
+        service.enqueued[0]["workflow_type"]
+        == LaunchStrategyWorkflow.WORKFLOW_TYPE
+    )
+
+
+def test_research_brief_requires_auth() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/workflows/research-brief",
+            json={
+                "workspace_id": str(uuid4()),
+                "brief": "Research coffee market in Australia",
+            },
+        )
+    assert response.status_code == 401
+
+
+def test_research_brief_enqueues_async() -> None:
+    from app.workflows.research_brief import ResearchBriefWorkflow
+
+    service = FakeLaunchStrategyService()
+    space_id = uuid4()
+    app.dependency_overrides[get_workflow_service] = lambda: service
+    try:
+        with authenticated_client("app.api.v1.workflows"):
+            with patch(
+                "app.api.v1.workflows.ProjectService"
+            ) as project_service_cls:
+                projects = project_service_cls.return_value
+                projects.default_space_id = AsyncMock(return_value=space_id)
+                with TestClient(app) as client:
+                    response = client.post(
+                        "/api/v1/workflows/research-brief",
+                        json={
+                            "workspace_id": str(uuid4()),
+                            "brief": "Research coffee market in Australia",
+                            "product_name": "Aussie Roast",
+                        },
+                    )
+    finally:
+        app.dependency_overrides.pop(get_workflow_service, None)
+
+    assert response.status_code == 202
+    payload = response.json()
+    assert payload["status"] == "pending"
+    assert payload["workflow_type"] == ResearchBriefWorkflow.WORKFLOW_TYPE
+    assert service.enqueued[0]["workflow_type"] == (
+        ResearchBriefWorkflow.WORKFLOW_TYPE
+    )
 
 
 def test_list_workflow_runs_requires_auth() -> None:

@@ -8,12 +8,16 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/).
 ### Added
 
 - Notion OAuth integration: connect workspace, list shared pages, import into a knowledge space via async ingest.
+- Research Brief async workflow (retrieve → research → persist) alongside Launch Strategy.
+- Assistant conversation list + New chat; mobile navigation drawer.
+- Document ingest status badges in Knowledge views.
 
 ### Documentation
 
 - Added engineering docs under `docs/` (agents, RAG, memory, API, deployment, development, roadmap).
 - Added CONTRIBUTING, SECURITY, CODE_OF_CONDUCT; README now acts as documentation hub.
 - Documented Notion endpoints in `docs/api.md`.
+- Product walkthrough in README and `docs/walkthrough.md`.
 
 ## [0.1.0] — 2026-07-18
 

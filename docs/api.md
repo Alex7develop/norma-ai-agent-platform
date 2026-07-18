@@ -54,7 +54,8 @@ routes require workspace membership (missing membership → **404**).
 
 | Method | Path | Notes |
 |-|-|-|
-| POST | `/workflows/launch-strategy` | Enqueue → **202** |
+| POST | `/workflows/launch-strategy` | Enqueue full pack → **202** |
+| POST | `/workflows/research-brief` | Enqueue short brief → **202** |
 | GET | `/workflows/runs` | History (`space_id`, `limit`) |
 | GET | `/workflows/runs/{id}` | Full artifacts + `current_step` |
 

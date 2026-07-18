@@ -2,11 +2,13 @@ import {
   File,
   FileText,
   LoaderCircle,
+  Menu,
   Trash2,
   UploadCloud,
 } from "lucide-react";
 
 import type { KnowledgeDocument } from "../lib/api";
+import { DocumentStatusBadge } from "../lib/documentStatus";
 
 import { NotionImportPanel } from "./NotionImportPanel";
 
@@ -20,6 +22,7 @@ interface KnowledgeWorkspaceProps {
   onDelete: (documentId: string) => Promise<void>;
   onRefreshDocuments: () => Promise<void>;
   onError: (message: string) => void;
+  onOpenNav?: () => void;
 }
 
 function formatBytes(bytes: number): string {
@@ -38,10 +41,21 @@ export function KnowledgeWorkspace({
   onDelete,
   onRefreshDocuments,
   onError,
+  onOpenNav,
 }: KnowledgeWorkspaceProps) {
   return (
     <main className="flex min-w-0 flex-1 flex-col bg-[#0b101a]">
       <header className="flex h-[68px] shrink-0 items-center border-b border-white/7 px-4 sm:px-6">
+        {onOpenNav && (
+          <button
+            type="button"
+            className="mr-3 text-slate-500 transition hover:text-slate-300 lg:hidden"
+            onClick={onOpenNav}
+            aria-label="Open navigation"
+          >
+            <Menu className="size-5" />
+          </button>
+        )}
         <div>
           <h1 className="text-sm font-semibold text-slate-100">
             Knowledge base
@@ -116,9 +130,12 @@ export function KnowledgeWorkspace({
                       <p className="truncate text-sm font-medium text-slate-200">
                         {document.filename}
                       </p>
-                      <p className="mt-1 text-xs text-slate-600">
-                        {formatBytes(document.size_bytes)} ·{" "}
-                        {document.chunk_count} chunks · {document.status}
+                      <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                        <span>
+                          {formatBytes(document.size_bytes)} ·{" "}
+                          {document.chunk_count} chunks
+                        </span>
+                        <DocumentStatusBadge status={document.status} />
                       </p>
                     </div>
                     <button

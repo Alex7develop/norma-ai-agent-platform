@@ -1,4 +1,4 @@
-"""Orchestrate Launch Strategy runs, persistence, and knowledge ingest."""
+"""Orchestrate workflow runs, persistence, and knowledge ingest."""
 
 from dataclasses import dataclass
 from uuid import UUID
@@ -18,6 +18,7 @@ from app.services.knowledge import KnowledgeService
 from app.services.memory import MemoryService
 from app.services.queue import JobQueue
 from app.workflows.launch_strategy import LaunchStrategyResult, LaunchStrategyWorkflow
+from app.workflows.research_brief import ResearchBriefResult, ResearchBriefWorkflow
 
 
 class WorkflowRunNotFound(LookupError):
@@ -49,18 +50,20 @@ class KnowledgeIngestAdapter:
 
 
 class LaunchStrategyService:
-    """Create, enqueue, execute, and load Launch Strategy workflow runs."""
+    """Create, enqueue, execute, and load workspace workflow runs."""
 
     def __init__(
         self,
         session: AsyncSession,
         workflow: LaunchStrategyWorkflow | None = None,
+        research_brief: ResearchBriefWorkflow | None = None,
         knowledge: KnowledgeService | None = None,
         memory: MemoryService | None = None,
         queue: JobQueue | None = None,
     ) -> None:
         self.session = session
         self.workflow = workflow
+        self.research_brief = research_brief
         self.knowledge = knowledge
         self.memory = memory
         self.queue = queue or JobQueue()
@@ -73,16 +76,23 @@ class LaunchStrategyService:
         brief: str,
         product_name: str | None = None,
         space_id: UUID | None = None,
+        workflow_type: str = LaunchStrategyWorkflow.WORKFLOW_TYPE,
     ) -> WorkflowRun:
         """Persist a pending run and push it onto the Redis queue."""
 
         if space_id is None:
             raise ValueError("space_id is required")
+        if workflow_type not in {
+            LaunchStrategyWorkflow.WORKFLOW_TYPE,
+            ResearchBriefWorkflow.WORKFLOW_TYPE,
+        }:
+            raise ValueError(f"Unsupported workflow_type: {workflow_type}")
+
         run = WorkflowRun(
             workspace_id=workspace_id,
             space_id=space_id,
             user_id=user_id,
-            workflow_type=LaunchStrategyWorkflow.WORKFLOW_TYPE,
+            workflow_type=workflow_type,
             status=WorkflowStatus.PENDING,
             brief=brief.strip(),
             product_name=(product_name or None),
@@ -93,14 +103,17 @@ class LaunchStrategyService:
         await self.session.refresh(run)
         # Avoid async lazy-load when the API serializes a brand-new pending run.
         set_committed_value(run, "artifacts", [])
-        await self.queue.enqueue_launch_strategy(run_id=run.id)
+        if workflow_type == ResearchBriefWorkflow.WORKFLOW_TYPE:
+            await self.queue.enqueue_research_brief(run_id=run.id)
+        else:
+            await self.queue.enqueue_launch_strategy(run_id=run.id)
         return run
 
     async def execute_run(self, *, run_id: UUID) -> WorkflowRun:
         """Worker entrypoint: load a pending run and execute the graph."""
 
-        if self.workflow is None or self.knowledge is None:
-            raise RuntimeError("Launch strategy workflow is not configured")
+        if self.knowledge is None:
+            raise RuntimeError("Workflow knowledge service is not configured")
 
         run = await self.session.scalar(
             select(WorkflowRun).where(WorkflowRun.id == run_id)
@@ -117,34 +130,64 @@ class LaunchStrategyService:
             run.current_step = step
             await self.session.commit()
 
-        self.workflow.on_progress = on_progress
-        self.workflow.persister = KnowledgeIngestAdapter(
-            self.knowledge, space_id=run.space_id
-        )
-        self.workflow.execution.persister = self.workflow.persister
+        persister = KnowledgeIngestAdapter(self.knowledge, space_id=run.space_id)
 
         try:
-            result = await self.workflow.invoke(
-                workspace_id=str(run.workspace_id),
-                space_id=str(run.space_id),
-                brief=run.brief,
-                product_name=run.product_name,
-            )
-            await self._persist_result(run, result)
-            if self.memory is not None:
-                await self.memory.remember_workflow_summary(
-                    workspace_id=run.workspace_id,
-                    space_id=run.space_id,
-                    run_id=run.id,
-                    summary_md=(
-                        f"Launch Strategy completed for **{result.product_name}**.\n\n"
-                        f"Brief: {run.brief.strip()[:500]}\n\n"
-                        f"Pack saved as `{result.pack_filename}` "
-                        f"(document_id={result.document_id})."
-                    ),
+            if run.workflow_type == ResearchBriefWorkflow.WORKFLOW_TYPE:
+                if self.research_brief is None:
+                    raise RuntimeError("Research brief workflow is not configured")
+                self.research_brief.on_progress = on_progress
+                self.research_brief.persister = persister
+                result = await self.research_brief.invoke(
+                    workspace_id=str(run.workspace_id),
+                    space_id=str(run.space_id),
+                    brief=run.brief,
+                    product_name=run.product_name,
                 )
+                await self._persist_research_brief_result(run, result)
+                if self.memory is not None:
+                    await self.memory.remember_workflow_summary(
+                        workspace_id=run.workspace_id,
+                        space_id=run.space_id,
+                        run_id=run.id,
+                        summary_md=(
+                            "Research Brief completed for "
+                            f"**{result.product_name}**.\n\n"
+                            f"Brief: {run.brief.strip()[:500]}\n\n"
+                            f"Saved as `{result.pack_filename}` "
+                            f"(document_id={result.document_id})."
+                        ),
+                    )
+                run.product_name = result.product_name
+            else:
+                if self.workflow is None:
+                    raise RuntimeError("Launch strategy workflow is not configured")
+                self.workflow.on_progress = on_progress
+                self.workflow.persister = persister
+                self.workflow.execution.persister = persister
+                result = await self.workflow.invoke(
+                    workspace_id=str(run.workspace_id),
+                    space_id=str(run.space_id),
+                    brief=run.brief,
+                    product_name=run.product_name,
+                )
+                await self._persist_result(run, result)
+                if self.memory is not None:
+                    await self.memory.remember_workflow_summary(
+                        workspace_id=run.workspace_id,
+                        space_id=run.space_id,
+                        run_id=run.id,
+                        summary_md=(
+                            "Launch Strategy completed for "
+                            f"**{result.product_name}**.\n\n"
+                            f"Brief: {run.brief.strip()[:500]}\n\n"
+                            f"Pack saved as `{result.pack_filename}` "
+                            f"(document_id={result.document_id})."
+                        ),
+                    )
+                run.product_name = result.product_name
+
             run.status = WorkflowStatus.COMPLETED
-            run.product_name = result.product_name
             run.current_step = "done"
             run.error = None
             await self.session.commit()
@@ -175,6 +218,28 @@ class LaunchStrategyService:
             "cursor_prompts": ArtifactKind.CURSOR_PROMPTS,
             "linkedin": ArtifactKind.LINKEDIN,
             "telegram": ArtifactKind.TELEGRAM,
+            "pack": ArtifactKind.PACK,
+        }
+        for artifact in result.artifacts:
+            self.session.add(
+                WorkflowArtifact(
+                    run_id=run.id,
+                    kind=kind_map[artifact.kind],
+                    title=artifact.title,
+                    content_md=artifact.content_md,
+                    document_id=artifact.document_id,
+                )
+            )
+        await self.session.flush()
+
+    async def _persist_research_brief_result(
+        self,
+        run: WorkflowRun,
+        result: ResearchBriefResult,
+    ) -> None:
+        kind_map = {
+            "research": ArtifactKind.RESEARCH,
+            "competitors": ArtifactKind.COMPETITORS,
             "pack": ArtifactKind.PACK,
         }
         for artifact in result.artifacts:

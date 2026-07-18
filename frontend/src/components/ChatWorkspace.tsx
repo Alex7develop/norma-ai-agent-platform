@@ -5,13 +5,14 @@ import {
   Database,
   LoaderCircle,
   Menu,
+  MessageSquarePlus,
   Paperclip,
   ShieldCheck,
   Sparkles,
   User,
 } from "lucide-react";
 
-import type { AssistantSource } from "../lib/api";
+import type { AssistantSource, ConversationSummary } from "../lib/api";
 
 export interface ChatMessage {
   id: string;
@@ -25,7 +26,13 @@ interface ChatWorkspaceProps {
   messages: ChatMessage[];
   thinking: boolean;
   documentsCount: number;
+  conversations: ConversationSummary[];
+  conversationId: string | null;
   onSend: (question: string) => Promise<void>;
+  onOpenNav: () => void;
+  onNewChat: () => void;
+  onSelectConversation: (conversationId: string) => void;
+  onNavigateKnowledge: () => void;
 }
 
 const suggestions = [
@@ -34,11 +41,23 @@ const suggestions = [
   "Which technologies does this project use?",
 ];
 
+function formatThreadDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 export function ChatWorkspace({
   messages,
   thinking,
   documentsCount,
+  conversations,
+  conversationId,
   onSend,
+  onOpenNav,
+  onNewChat,
+  onSelectConversation,
+  onNavigateKnowledge,
 }: ChatWorkspaceProps) {
   const [question, setQuestion] = useState("");
 
@@ -52,17 +71,22 @@ export function ChatWorkspace({
 
   return (
     <main className="flex min-w-0 flex-1 flex-col bg-[#0b101a]">
-      <header className="flex h-[68px] shrink-0 items-center border-b border-white/7 px-4 sm:px-6">
-        <button className="mr-3 text-slate-500 lg:hidden">
+      <header className="flex h-[68px] shrink-0 items-center gap-3 border-b border-white/7 px-4 sm:px-6">
+        <button
+          type="button"
+          className="mr-1 text-slate-500 transition hover:text-slate-300 lg:hidden"
+          onClick={onOpenNav}
+          aria-label="Open navigation"
+        >
           <Menu className="size-5" />
         </button>
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <div className="relative grid size-9 place-items-center rounded-xl border border-cyan-400/15 bg-cyan-400/8 text-cyan-300">
             <Bot className="size-4" />
             <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-[#0b101a] bg-emerald-400" />
           </div>
-          <div>
-            <h1 className="text-sm font-semibold text-slate-100">
+          <div className="min-w-0">
+            <h1 className="truncate text-sm font-semibold text-slate-100">
               Knowledge Assistant
             </h1>
             <p className="mt-0.5 text-[10px] text-slate-600">
@@ -70,11 +94,47 @@ export function ChatWorkspace({
             </p>
           </div>
         </div>
-        <div className="ml-auto flex items-center gap-2 rounded-lg border border-white/7 bg-white/[0.025] px-2.5 py-1.5 text-[10px] text-slate-500">
-          <ShieldCheck className="size-3 text-emerald-400" />
-          Workspace isolated
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/8 bg-white/[0.025] px-2.5 py-1.5 text-[10px] text-slate-400 transition hover:border-cyan-400/25 hover:text-cyan-200"
+            onClick={onNewChat}
+          >
+            <MessageSquarePlus className="size-3.5" />
+            New chat
+          </button>
+          <div className="hidden items-center gap-2 rounded-lg border border-white/7 bg-white/[0.025] px-2.5 py-1.5 text-[10px] text-slate-500 sm:flex">
+            <ShieldCheck className="size-3 text-emerald-400" />
+            Workspace isolated
+          </div>
         </div>
       </header>
+
+      {conversations.length > 0 && (
+        <div className="flex shrink-0 gap-1.5 overflow-x-auto border-b border-white/7 px-4 py-2 sm:px-6">
+          {conversations.map((thread) => {
+            const active = thread.id === conversationId;
+            return (
+              <button
+                key={thread.id}
+                type="button"
+                className={`max-w-[180px] shrink-0 truncate rounded-lg px-2.5 py-1.5 text-[10px] transition ${
+                  active
+                    ? "bg-cyan-400/10 text-cyan-100"
+                    : "text-slate-500 hover:bg-white/[0.04] hover:text-slate-300"
+                }`}
+                onClick={() => onSelectConversation(thread.id)}
+                title={thread.title}
+              >
+                <span className="truncate">{thread.title || "Untitled"}</span>
+                <span className="ml-1.5 opacity-60">
+                  {formatThreadDate(thread.updated_at)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex min-h-full max-w-3xl flex-col px-4 sm:px-8">
@@ -90,17 +150,32 @@ export function ChatWorkspace({
                 Ask Norma about your documents. Every response is grounded in
                 your workspace and includes its sources.
               </p>
-              <div className="mx-auto mt-7 grid max-w-xl gap-2 sm:grid-cols-3">
-                {suggestions.map((suggestion) => (
+              {documentsCount === 0 ? (
+                <div className="mx-auto mt-7 max-w-md">
                   <button
-                    className="rounded-xl border border-white/7 bg-white/[0.025] px-3 py-3 text-left text-[11px] leading-4 text-slate-500 transition hover:border-cyan-400/20 hover:bg-cyan-400/[0.025] hover:text-slate-300"
-                    key={suggestion}
-                    onClick={() => void onSend(suggestion)}
+                    type="button"
+                    className="w-full rounded-xl border border-cyan-400/25 bg-cyan-400/10 px-4 py-3 text-sm font-medium text-cyan-100 transition hover:bg-cyan-400/15"
+                    onClick={onNavigateKnowledge}
                   >
-                    {suggestion}
+                    Upload or open Knowledge
                   </button>
-                ))}
-              </div>
+                  <p className="mt-2 text-[11px] text-slate-600">
+                    Add documents first so answers can cite your sources.
+                  </p>
+                </div>
+              ) : (
+                <div className="mx-auto mt-7 grid max-w-xl gap-2 sm:grid-cols-3">
+                  {suggestions.map((suggestion) => (
+                    <button
+                      className="rounded-xl border border-white/7 bg-white/[0.025] px-3 py-3 text-left text-[11px] leading-4 text-slate-500 transition hover:border-cyan-400/20 hover:bg-cyan-400/[0.025] hover:text-slate-300"
+                      key={suggestion}
+                      onClick={() => void onSend(suggestion)}
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-7 py-8">
@@ -191,7 +266,9 @@ export function ChatWorkspace({
             <div className="flex items-center px-1 pb-0.5">
               <button
                 type="button"
-                className="grid size-8 place-items-center rounded-lg text-slate-600 transition hover:bg-white/5 hover:text-slate-400"
+                disabled
+                title="Soon"
+                className="grid size-8 place-items-center rounded-lg text-slate-700"
               >
                 <Paperclip className="size-4" />
               </button>

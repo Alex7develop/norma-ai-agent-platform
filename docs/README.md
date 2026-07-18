@@ -13,6 +13,7 @@ dive into the subsystem you are changing.
 | [deployment.md](deployment.md) | Docker Compose and ops notes |
 | [development.md](development.md) | Local backend/frontend workflow |
 | [roadmap.md](roadmap.md) | Phased product roadmap |
+| [walkthrough.md](walkthrough.md) | End-to-end product demo path |
 
 Community / project meta:
 

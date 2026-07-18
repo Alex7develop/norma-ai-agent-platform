@@ -58,6 +58,24 @@ queued → retrieve → research → planning → spec → content → persist �
 Artifacts are stored in `workflow_artifacts`. Clients poll
 `GET /api/v1/workflows/runs/{run_id}` and watch `current_step`.
 
+## Workflow 3 — Research Brief
+
+Entry: `POST /api/v1/workflows/research-brief` → **202** + `run_id`
+
+Worker executes:
+
+```text
+queued → retrieve → research → persist → done
+```
+
+1. Retrieve knowledge-space context for the brief  
+2. Research Agent (web + workspace) → research + competitors  
+3. Assemble a short markdown brief → `KnowledgeService.ingest`  
+4. Memory summary → PostgreSQL + Qdrant (`source_type=memory`)
+
+Same run history and polling APIs as Launch Strategy; `workflow_type` is
+`research_brief`.
+
 ## Design rules
 
 - Retrieved and web content is untrusted prompt context.

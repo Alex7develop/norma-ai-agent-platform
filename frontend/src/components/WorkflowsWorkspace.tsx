@@ -5,7 +5,9 @@ import {
   Circle,
   FileText,
   LoaderCircle,
+  Menu,
   Rocket,
+  Search,
 } from "lucide-react";
 
 import type {
@@ -16,7 +18,9 @@ import type {
 
 import { ArtifactReader } from "./ArtifactReader";
 
-const PIPELINE_STEPS = [
+export type WorkflowKind = "launch_strategy" | "research_brief";
+
+const LAUNCH_PIPELINE = [
   "queued",
   "retrieve",
   "research",
@@ -27,12 +31,25 @@ const PIPELINE_STEPS = [
   "done",
 ] as const;
 
+const BRIEF_PIPELINE = [
+  "queued",
+  "retrieve",
+  "research",
+  "persist",
+  "done",
+] as const;
+
 interface WorkflowsWorkspaceProps {
   runs: WorkflowRunSummary[];
   activeRun: WorkflowRun | null;
   enqueueing: boolean;
-  onEnqueue: (brief: string, productName?: string) => Promise<void>;
+  onEnqueue: (
+    brief: string,
+    productName: string | undefined,
+    workflowKind: WorkflowKind,
+  ) => Promise<void>;
   onSelectRun: (runId: string) => Promise<void>;
+  onOpenNav?: () => void;
 }
 
 function statusLabel(run: WorkflowRunSummary | WorkflowRun): string {
@@ -57,13 +74,21 @@ function formatElapsed(startedAt: string, nowMs: number): string {
   return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
 }
 
+function workflowLabel(type: string): string {
+  if (type === "research_brief") return "Research Brief";
+  return "Launch Strategy";
+}
+
 export function WorkflowsWorkspace({
   runs,
   activeRun,
   enqueueing,
   onEnqueue,
   onSelectRun,
+  onOpenNav,
 }: WorkflowsWorkspaceProps) {
+  const [workflowKind, setWorkflowKind] =
+    useState<WorkflowKind>("launch_strategy");
   const [brief, setBrief] = useState(
     "I want to open a network of coffee shops in Australia.",
   );
@@ -93,10 +118,16 @@ export function WorkflowsWorkspace({
     activeRun?.status === "pending" ||
     activeRun?.status === "running";
 
+  const pipeline =
+    (activeRun?.workflow_type === "research_brief"
+      ? BRIEF_PIPELINE
+      : workflowKind === "research_brief"
+        ? BRIEF_PIPELINE
+        : LAUNCH_PIPELINE) as readonly string[];
+
+  const displayType = activeRun?.workflow_type ?? workflowKind;
   const currentStep = normalizeStep(activeRun?.current_step);
-  const currentIndex = PIPELINE_STEPS.indexOf(
-    currentStep as (typeof PIPELINE_STEPS)[number],
-  );
+  const currentIndex = pipeline.indexOf(currentStep);
 
   useEffect(() => {
     if (!busy) return;
@@ -110,22 +141,34 @@ export function WorkflowsWorkspace({
     if (!value || busy) return;
     setFullscreen(false);
     setSelection(null);
-    await onEnqueue(value, productName.trim() || undefined);
+    await onEnqueue(value, productName.trim() || undefined, workflowKind);
   }
 
   return (
     <main className="flex min-w-0 flex-1 flex-col bg-[#0b101a]">
       <header className="flex h-[68px] shrink-0 items-center border-b border-white/7 px-4 sm:px-6">
+        {onOpenNav && (
+          <button
+            type="button"
+            className="mr-3 text-slate-500 transition hover:text-slate-300 lg:hidden"
+            onClick={onOpenNav}
+            aria-label="Open navigation"
+          >
+            <Menu className="size-5" />
+          </button>
+        )}
         <div className="flex items-center gap-3">
           <div className="grid size-9 place-items-center rounded-xl border border-amber-400/20 bg-amber-400/10 text-amber-300">
-            <Rocket className="size-4" />
+            {displayType === "research_brief" ? (
+              <Search className="size-4" />
+            ) : (
+              <Rocket className="size-4" />
+            )}
           </div>
           <div>
-            <h1 className="text-sm font-semibold text-slate-100">
-              Launch Strategy
-            </h1>
+            <h1 className="text-sm font-semibold text-slate-100">Workflows</h1>
             <p className="mt-0.5 text-[10px] text-slate-600">
-              Async multi-agent pack · history · web research
+              {workflowLabel(displayType)} · async agents · history
             </p>
           </div>
         </div>
@@ -152,6 +195,32 @@ export function WorkflowsWorkspace({
             className="shrink-0 space-y-2 border-b border-white/7 p-4"
             onSubmit={(event) => void submit(event)}
           >
+            <div className="grid grid-cols-2 gap-1 rounded-lg border border-white/8 bg-white/[0.02] p-1">
+              <button
+                type="button"
+                disabled={busy}
+                className={`rounded-md px-2 py-1.5 text-[10px] font-medium transition ${
+                  workflowKind === "launch_strategy"
+                    ? "bg-amber-400/15 text-amber-100"
+                    : "text-slate-500 hover:text-slate-300"
+                }`}
+                onClick={() => setWorkflowKind("launch_strategy")}
+              >
+                Launch Strategy
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                className={`rounded-md px-2 py-1.5 text-[10px] font-medium transition ${
+                  workflowKind === "research_brief"
+                    ? "bg-amber-400/15 text-amber-100"
+                    : "text-slate-500 hover:text-slate-300"
+                }`}
+                onClick={() => setWorkflowKind("research_brief")}
+              >
+                Research Brief
+              </button>
+            </div>
             <input
               className="w-full rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2 text-xs text-slate-200 outline-none placeholder:text-slate-600 focus:border-amber-400/30"
               placeholder="Product name (optional)"
@@ -180,8 +249,13 @@ export function WorkflowsWorkspace({
                 </>
               ) : (
                 <>
-                  <Rocket className="size-3.5" />
-                  Run agents
+                  {workflowKind === "research_brief" ? (
+                    <Search className="size-3.5" />
+                  ) : (
+                    <Rocket className="size-3.5" />
+                  )}
+                  Run{" "}
+                  {workflowKind === "research_brief" ? "brief" : "agents"}
                 </>
               )}
             </button>
@@ -202,7 +276,7 @@ export function WorkflowsWorkspace({
                   : ""}
               </p>
               <ol className="space-y-1">
-                {PIPELINE_STEPS.map((step, index) => {
+                {pipeline.map((step, index) => {
                   const done =
                     activeRun.status === "completed" ||
                     (currentIndex >= 0 && index < currentIndex);
@@ -264,6 +338,7 @@ export function WorkflowsWorkspace({
                           {item.product_name || item.brief.slice(0, 48)}
                         </span>
                         <span className="mt-0.5 text-[10px] opacity-70">
+                          {workflowLabel(item.workflow_type)} ·{" "}
                           {statusLabel(item)}
                         </span>
                       </button>
@@ -331,7 +406,7 @@ export function WorkflowsWorkspace({
                 <p className="mt-4 text-sm text-slate-400">
                   {busy
                     ? "Agents are working in the background…"
-                    : "Select a run or start a new Launch Strategy"}
+                    : "Select a run or start Launch Strategy / Research Brief"}
                 </p>
                 <p className="mt-1 text-xs text-slate-600">
                   Completed packs open here at full height.

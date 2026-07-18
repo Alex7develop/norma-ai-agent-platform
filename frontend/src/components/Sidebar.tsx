@@ -33,6 +33,8 @@ interface SidebarProps {
   projectId: string | null;
   spaceId: string | null;
   activeView: AppView;
+  mobileOpen: boolean;
+  onClose: () => void;
   onNavigate: (view: AppView) => void;
   onSelectWorkspace: (workspaceId: string) => void;
   onSelectProject: (projectId: string) => void;
@@ -50,6 +52,8 @@ export function Sidebar({
   projectId,
   spaceId,
   activeView,
+  mobileOpen,
+  onClose,
   onNavigate,
   onSelectWorkspace,
   onSelectProject,
@@ -98,8 +102,26 @@ export function Sidebar({
     }
   }
 
+  function navigate(view: AppView) {
+    onNavigate(view);
+    onClose();
+  }
+
   return (
-    <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-white/7 bg-[#090d16] px-3 py-4 lg:flex">
+    <>
+      {mobileOpen && (
+        <button
+          type="button"
+          aria-label="Close navigation"
+          className="fixed inset-0 z-40 bg-black/55 lg:hidden"
+          onClick={onClose}
+        />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex h-screen w-64 shrink-0 flex-col border-r border-white/7 bg-[#090d16] px-3 py-4 transition-transform lg:static lg:z-auto lg:translate-x-0 ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        } ${mobileOpen ? "flex" : "hidden lg:flex"}`}
+      >
       <div className="flex items-center gap-3 px-3 py-2">
         <div className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 shadow-lg shadow-cyan-950">
           <Sparkles className="size-4 text-white" />
@@ -251,7 +273,7 @@ export function Sidebar({
               }`}
               key={id}
               type="button"
-              onClick={() => onNavigate(id)}
+              onClick={() => navigate(id)}
             >
               <Icon className="size-4" />
               <span>{label}</span>
@@ -272,7 +294,9 @@ export function Sidebar({
         </div>
         <button
           type="button"
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-500 transition hover:bg-white/[0.04] hover:text-slate-300"
+          disabled
+          title="Soon"
+          className="flex w-full cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-700"
         >
           <Settings className="size-4" />
           Settings
@@ -287,5 +311,6 @@ export function Sidebar({
         </button>
       </div>
     </aside>
+    </>
   );
 }

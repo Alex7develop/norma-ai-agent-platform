@@ -20,6 +20,8 @@ from app.schemas.workflows import (
 from app.services.launch_strategy import LaunchStrategyService, WorkflowRunNotFound
 from app.services.projects import ProjectService, SpaceNotFound
 from app.services.queue import JobQueue
+from app.workflows.launch_strategy import LaunchStrategyWorkflow
+from app.workflows.research_brief import ResearchBriefWorkflow
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/workflows", tags=["workflows"])
@@ -29,6 +31,47 @@ def get_workflow_service(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> LaunchStrategyService:
     return LaunchStrategyService(session, queue=JobQueue())
+
+
+async def _enqueue_workflow(
+    *,
+    payload: LaunchStrategyRequest,
+    service: LaunchStrategyService,
+    session: AsyncSession,
+    user: User,
+    workflow_type: str,
+) -> WorkflowRunResponse:
+    await require_workspace_access(
+        session, user_id=user.id, workspace_id=payload.workspace_id
+    )
+    projects = ProjectService(session)
+    try:
+        if payload.space_id is None:
+            space_id = await projects.default_space_id(
+                workspace_id=payload.workspace_id, user_id=user.id
+            )
+        else:
+            await projects.require_space(
+                space_id=payload.space_id, workspace_id=payload.workspace_id
+            )
+            space_id = payload.space_id
+        run = await service.enqueue(
+            workspace_id=payload.workspace_id,
+            user_id=user.id,
+            brief=payload.brief,
+            product_name=payload.product_name,
+            space_id=space_id,
+            workflow_type=workflow_type,
+        )
+    except SpaceNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Failed to enqueue %s", workflow_type)
+        raise HTTPException(
+            status_code=503, detail="Failed to enqueue workflow job"
+        ) from exc
+
+    return _run_response(run)
 
 
 def _artifact_response(artifact: WorkflowArtifact) -> WorkflowArtifactResponse:
@@ -89,36 +132,35 @@ async def enqueue_launch_strategy(
 ) -> WorkflowRunResponse:
     """Enqueue Launch Strategy and return immediately for polling."""
 
-    await require_workspace_access(
-        session, user_id=user.id, workspace_id=payload.workspace_id
+    return await _enqueue_workflow(
+        payload=payload,
+        service=service,
+        session=session,
+        user=user,
+        workflow_type=LaunchStrategyWorkflow.WORKFLOW_TYPE,
     )
-    projects = ProjectService(session)
-    try:
-        if payload.space_id is None:
-            space_id = await projects.default_space_id(
-                workspace_id=payload.workspace_id, user_id=user.id
-            )
-        else:
-            await projects.require_space(
-                space_id=payload.space_id, workspace_id=payload.workspace_id
-            )
-            space_id = payload.space_id
-        run = await service.enqueue(
-            workspace_id=payload.workspace_id,
-            user_id=user.id,
-            brief=payload.brief,
-            product_name=payload.product_name,
-            space_id=space_id,
-        )
-    except SpaceNotFound as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except Exception as exc:
-        logger.exception("Failed to enqueue launch strategy")
-        raise HTTPException(
-            status_code=503, detail="Failed to enqueue workflow job"
-        ) from exc
 
-    return _run_response(run)
+
+@router.post(
+    "/research-brief",
+    response_model=WorkflowRunResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def enqueue_research_brief(
+    payload: LaunchStrategyRequest,
+    service: Annotated[LaunchStrategyService, Depends(get_workflow_service)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> WorkflowRunResponse:
+    """Enqueue Research Brief and return immediately for polling."""
+
+    return await _enqueue_workflow(
+        payload=payload,
+        service=service,
+        session=session,
+        user=user,
+        workflow_type=ResearchBriefWorkflow.WORKFLOW_TYPE,
+    )
 
 
 @router.get("/runs", response_model=list[WorkflowRunSummary])

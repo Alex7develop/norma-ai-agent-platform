@@ -51,7 +51,7 @@ the main branch.
 
 - [x] `docs/architecture.md` and sibling engineering pages
 - [x] Community files (`CONTRIBUTING`, `CHANGELOG`, `SECURITY`, `CODE_OF_CONDUCT`)
-- [ ] Demo GIF / recorded walkthrough in README
+- [x] Demo / recorded walkthrough in README (`docs/walkthrough.md`)
 - [ ] Published API reference beyond OpenAPI
 
 See [CHANGELOG.md](../CHANGELOG.md) for release notes.

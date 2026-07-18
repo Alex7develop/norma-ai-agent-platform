@@ -1,4 +1,4 @@
-"""Unified Redis worker for Launch Strategy and knowledge ingest jobs."""
+"""Unified Redis worker for workflows and knowledge ingest jobs."""
 
 from __future__ import annotations
 
@@ -16,19 +16,25 @@ from app.services.memory import MemoryService
 from app.services.queue import (
     KNOWLEDGE_INGEST_JOB,
     LAUNCH_STRATEGY_JOB,
+    RESEARCH_BRIEF_JOB,
     JobQueue,
 )
 from app.workflows.launch_strategy import LaunchStrategyWorkflow
+from app.workflows.research_brief import ResearchBriefWorkflow
 
 logger = logging.getLogger(__name__)
 
 
-async def process_launch_strategy(run_id: UUID) -> None:
+async def process_workflow_run(run_id: UUID) -> None:
     async with SessionFactory() as session:
         knowledge = KnowledgeService(session)
         memory = MemoryService(session)
         try:
-            workflow = LaunchStrategyWorkflow(
+            launch = LaunchStrategyWorkflow(
+                retriever,
+                KnowledgeIngestAdapter(knowledge, space_id=uuid4()),
+            )
+            brief = ResearchBriefWorkflow(
                 retriever,
                 KnowledgeIngestAdapter(knowledge, space_id=uuid4()),
             )
@@ -37,14 +43,16 @@ async def process_launch_strategy(run_id: UUID) -> None:
             return
         service = LaunchStrategyService(
             session,
-            workflow=workflow,
+            workflow=launch,
+            research_brief=brief,
             knowledge=knowledge,
             memory=memory,
         )
         try:
             await service.execute_run(run_id=run_id)
         finally:
-            await workflow.client.close()
+            await launch.client.close()
+            await brief.client.close()
 
 
 async def process_knowledge_ingest(document_id: UUID) -> None:
@@ -55,8 +63,8 @@ async def process_knowledge_ingest(document_id: UUID) -> None:
 
 async def process_job(payload: dict[str, object]) -> None:
     job_type = payload.get("type")
-    if job_type == LAUNCH_STRATEGY_JOB:
-        await process_launch_strategy(UUID(str(payload["run_id"])))
+    if job_type in {LAUNCH_STRATEGY_JOB, RESEARCH_BRIEF_JOB}:
+        await process_workflow_run(UUID(str(payload["run_id"])))
         return
     if job_type == KNOWLEDGE_INGEST_JOB:
         await process_knowledge_ingest(UUID(str(payload["document_id"])))

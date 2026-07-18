@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 
 import type { KnowledgeDocument } from "../lib/api";
+import { DocumentStatusBadge } from "../lib/documentStatus";
 
 interface KnowledgePanelProps {
   documents: KnowledgeDocument[];
@@ -117,9 +118,12 @@ export function KnowledgePanel({
                   <p className="truncate text-xs font-medium text-slate-300">
                     {document.filename}
                   </p>
-                  <p className="mt-1 text-[10px] text-slate-600">
-                    {formatBytes(document.size_bytes)} · {document.chunk_count}{" "}
-                    chunks
+                  <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-600">
+                    <span>
+                      {formatBytes(document.size_bytes)} · {document.chunk_count}{" "}
+                      chunks
+                    </span>
+                    <DocumentStatusBadge status={document.status} />
                   </p>
                 </div>
                 <button

@@ -9,7 +9,10 @@ import {
 import { KnowledgePanel } from "./components/KnowledgePanel";
 import { KnowledgeWorkspace } from "./components/KnowledgeWorkspace";
 import { Sidebar, type AppView } from "./components/Sidebar";
-import { WorkflowsWorkspace } from "./components/WorkflowsWorkspace";
+import {
+  WorkflowsWorkspace,
+  type WorkflowKind,
+} from "./components/WorkflowsWorkspace";
 import {
   ApiError,
   askAssistant,
@@ -25,10 +28,12 @@ import {
   listDocuments,
   listProjects,
   listWorkflowRuns,
+  type ConversationSummary,
   type KnowledgeDocument,
   type Project,
   logout,
   runLaunchStrategy,
+  runResearchBrief,
   type WorkflowRun,
   type WorkflowRunSummary,
   uploadDocument,
@@ -68,6 +73,8 @@ export function App() {
   }>({ spaceId: null, documents: [] });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [enqueueing, setEnqueueing] = useState(false);
@@ -99,6 +106,8 @@ export function App() {
     setDocumentCache({ spaceId: null, documents: [] });
     setMessages([]);
     setConversationId(null);
+    setConversations([]);
+    setMobileNavOpen(false);
     setLaunchRun(null);
     setWorkflowRuns([]);
   }
@@ -189,15 +198,15 @@ export function App() {
       });
 
     void listConversations(resolvedWorkspaceId, resolvedSpaceId)
-      .then(async (conversations) => {
-        if (!active || conversations.length === 0) {
-          if (active) {
-            setConversationId(null);
-            setMessages([]);
-          }
+      .then(async (items) => {
+        if (!active) return;
+        setConversations(items);
+        if (items.length === 0) {
+          setConversationId(null);
+          setMessages([]);
           return;
         }
-        const latest = conversations[0];
+        const latest = items[0];
         const history = await listConversationMessages(
           resolvedWorkspaceId,
           latest.id,
@@ -214,6 +223,7 @@ export function App() {
       })
       .catch(() => {
         if (!active) return;
+        setConversations([]);
         setConversationId(null);
       });
 
@@ -351,6 +361,9 @@ export function App() {
           model: response.model,
         },
       ]);
+      void listConversations(resolvedWorkspaceId, resolvedSpaceId).then(
+        setConversations,
+      );
     } catch (requestError) {
       const message = errorMessage(requestError);
       setMessages((current) => [
@@ -367,12 +380,18 @@ export function App() {
     }
   }
 
-  async function handleEnqueue(brief: string, productName?: string) {
+  async function handleEnqueue(
+    brief: string,
+    productName: string | undefined,
+    workflowKind: WorkflowKind,
+  ) {
     if (!resolvedWorkspaceId) return;
     setEnqueueing(true);
     setError(null);
     try {
-      const result = await runLaunchStrategy({
+      const runner =
+        workflowKind === "research_brief" ? runResearchBrief : runLaunchStrategy;
+      const result = await runner({
         workspaceId: resolvedWorkspaceId,
         brief,
         productName,
@@ -392,6 +411,28 @@ export function App() {
     try {
       const result = await getWorkflowRun(resolvedWorkspaceId, runId);
       setLaunchRun(result);
+    } catch (requestError) {
+      setError(errorMessage(requestError));
+    }
+  }
+
+  function handleNewChat() {
+    setConversationId(null);
+    setMessages([]);
+  }
+
+  async function handleSelectConversation(id: string) {
+    if (!resolvedWorkspaceId) return;
+    try {
+      const history = await listConversationMessages(resolvedWorkspaceId, id);
+      setConversationId(id);
+      setMessages(
+        history.map((item) => ({
+          id: item.id,
+          role: item.role === "assistant" ? "assistant" : "user",
+          content: item.content,
+        })),
+      );
     } catch (requestError) {
       setError(errorMessage(requestError));
     }
@@ -472,6 +513,8 @@ export function App() {
         projectId={activeProject?.id ?? null}
         spaceId={resolvedSpaceId}
         activeView={view}
+        mobileOpen={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
         onNavigate={setView}
         onSelectWorkspace={(id) => {
           localStorage.setItem(WORKSPACE_STORAGE_KEY, id);
@@ -494,7 +537,13 @@ export function App() {
             messages={messages}
             thinking={thinking}
             documentsCount={documents.length}
+            conversations={conversations}
+            conversationId={conversationId}
             onSend={handleSend}
+            onOpenNav={() => setMobileNavOpen(true)}
+            onNewChat={handleNewChat}
+            onSelectConversation={(id) => void handleSelectConversation(id)}
+            onNavigateKnowledge={() => setView("knowledge")}
           />
           <KnowledgePanel
             documents={documents}
@@ -512,6 +561,7 @@ export function App() {
           enqueueing={enqueueing}
           onEnqueue={handleEnqueue}
           onSelectRun={handleSelectRun}
+          onOpenNav={() => setMobileNavOpen(true)}
         />
       )}
       {view === "knowledge" && resolvedSpaceId && (
@@ -525,6 +575,7 @@ export function App() {
           onDelete={handleDelete}
           onRefreshDocuments={refreshDocuments}
           onError={(message) => setError(message)}
+          onOpenNav={() => setMobileNavOpen(true)}
         />
       )}
       {error && (

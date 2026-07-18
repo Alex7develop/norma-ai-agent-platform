@@ -57,13 +57,26 @@ outcomes**.
 - **RAG knowledge base** — PDF / DOCX / Markdown / TXT, async index, space isolation  
 - **RAG Assistant** — cited answers, conversation threads, memory notes  
 - **Launch Strategy pack** — research → planning → specs → content → ingest  
+- **Research Brief** — shorter async workflow: retrieve → research → persist  
 - **Live web research** — DuckDuckGo snippets for the Research Agent  
 - **Auth** — email/password, HttpOnly JWT cookies, workspace membership  
 - **Projects & knowledge spaces** — UI switcher + create flows  
-- **Async workers** — Redis queue for documents and Launch Strategy, heartbeat readiness  
+- **Async workers** — Redis queue for documents and workflows, heartbeat readiness  
 - **React workspace** — Assistant / Workflows / Knowledge views  
 
-Deep dives: [agents](docs/agents.md) · [RAG](docs/rag.md) · [memory](docs/memory.md) · [API](docs/api.md)
+Deep dives: [agents](docs/agents.md) · [RAG](docs/rag.md) · [memory](docs/memory.md) · [API](docs/api.md) · [Walkthrough](docs/walkthrough.md)
+
+---
+
+# Walkthrough
+
+1. **Register** — create an account at the auth screen.  
+2. **Upload knowledge** — Knowledge view: file upload or Notion import; wait for **completed**.  
+3. **Ask** — Assistant: New chat, question grounded in your space.  
+4. **Run a workflow** — Workflows: Launch Strategy or Research Brief.  
+5. **Inspect** — open artifacts; the persisted pack appears in Knowledge.
+
+Full steps: [docs/walkthrough.md](docs/walkthrough.md).
 
 ---
 
