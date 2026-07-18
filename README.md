@@ -2,10 +2,8 @@
 
 # Norma AI
 
-### The AI operating system for knowledge and execution
-
-**An autonomous AI workspace that understands your information,  
-remembers context, and helps you execute complex tasks.**
+**An open-source AI operating system that combines agentic workflows,  
+long-term memory, and RAG to transform knowledge into action.**
 
 <br/>
 
@@ -17,8 +15,6 @@ remembers context, and helps you execute complex tasks.**
 [![License](https://img.shields.io/badge/license-MIT-purple.svg)](LICENSE)
 
 <br/>
-
-**Transform scattered information into structured knowledge and autonomous action.**
 
 [Documentation](docs/README.md) · [Walkthrough](docs/walkthrough.md) · [Roadmap](docs/roadmap.md) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
 
